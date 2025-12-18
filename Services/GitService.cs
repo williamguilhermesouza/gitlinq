@@ -10,11 +10,26 @@ namespace GitLinq.Services
             _repositoryPath = repositoryPath;
         }
 
-        public List<Commit> GetCommits()
+        public IEnumerable<Commit> GetCommits()
         {
             using var repository = new Repository(_repositoryPath);
 
-            return repository.Commits.ToList();
+            foreach (var commit in repository.Commits)
+                yield return commit;
+        }
+        public static string? FindGitRoot(string startPath)
+        {
+            var dir = new DirectoryInfo(startPath);
+
+            while (dir != null)
+            {
+                if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+                    return dir.FullName;
+
+                dir = dir.Parent;
+            }
+
+            return null;
         }
     }
 }
