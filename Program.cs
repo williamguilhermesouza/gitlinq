@@ -1,8 +1,13 @@
-﻿using Spectre.Console;
+﻿using GitLinq.Commands;
+using Spectre.Console;
 
 ReadLine.HistoryEnabled = true;
+var commands = new List<ICommand>
+{
+    new Clear()
+};
 
-while (Prompt(out string input))
+while (Prompt(out string input, commands))
 {
     if (string.IsNullOrEmpty(input))
         continue;
@@ -11,9 +16,14 @@ while (Prompt(out string input))
         break;
 }
 
-static bool Prompt(out string input)
+return;
+
+static bool Prompt(out string input, List<ICommand> commands)
 {
-    input = ReadLine.Read("gitlinq> ");
+    var text = ReadLine.Read("gitlinq> ");
+    input = text;
+    commands.FirstOrDefault(com => text == com.Name || com.Aliases.Contains(text))?.Execute();
+    
     AnsiConsole.MarkupLine($"[green] typed: [/] {input}");
     return true;
 }
