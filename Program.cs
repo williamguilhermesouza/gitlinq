@@ -1,7 +1,9 @@
-﻿using GitLinq.Commands;
+﻿using GitLinq;
+using GitLinq.Commands;
 using Spectre.Console;
 
 ReadLine.HistoryEnabled = true;
+ReadLine.AutoCompletionHandler = new AutoCompletionHandler();
 var commands = new List<ICommand>
 {
     new Clear()
