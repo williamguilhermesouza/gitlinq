@@ -50,5 +50,8 @@ static bool Prompt(out string input, List<ICommand> commands)
     input = text;
     commands.FirstOrDefault(com => text == com.Name || com.Aliases.Contains(text))?.Execute();
 
+    var parsed = QueryParser.ParseExpression(input);
+    AnsiConsole.MarkupLine($"parsed: [green]{parsed}[/]");
+
     return true;
 }
