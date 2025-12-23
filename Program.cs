@@ -2,6 +2,9 @@
 using GitLinq.Commands;
 using GitLinq.Services;
 using Spectre.Console;
+using LibGit2Sharp;
+using GitLinq.AST;
+using System.Linq.Expressions;
 
 ReadLine.HistoryEnabled = true;
 ReadLine.AutoCompletionHandler = new AutoCompletionHandler();
@@ -18,7 +21,7 @@ if (gitRoot == null)
 
 var gitService = new GitService(gitRoot);
 
-while (Prompt(out string input, commands))
+while (Prompt(out string input))
 {
     if (string.IsNullOrEmpty(input))
         continue;
@@ -26,9 +29,19 @@ while (Prompt(out string input, commands))
     if (input.Equals("exit", StringComparison.OrdinalIgnoreCase))
         break;
 
-    if (input == "Commits")
-    {
+    if (TryExecuteCommand(input, commands))
+        continue;
+    
+    var parsed = QueryParser.ParseExpression(input);
+    // AnsiConsole.MarkupLine($"parsed: [green]{parsed}[/]");
+
+    // if (input == "Commits")
+    // {
         var commits = gitService.GetCommits();
+        var expression = LinqExpressionBuilder.BuildExpression<Commit>(parsed);
+        var result = commits.AsQueryable().Where(expression).ToList();
+        commits = result;
+        
         var table = new Table();
         table.AddColumn("[green]Id[/]");
         table.AddColumn("Message");
@@ -39,19 +52,27 @@ while (Prompt(out string input, commands))
         }
 
         AnsiConsole.Write(table);
-    }
+    // }
 }
 
 return;
 
-static bool Prompt(out string input, List<ICommand> commands)
+static bool Prompt(out string input)
 {
     var text = ReadLine.Read("gitlinq> ");
     input = text;
-    commands.FirstOrDefault(com => text == com.Name || com.Aliases.Contains(text))?.Execute();
-
-    var parsed = QueryParser.ParseExpression(input);
-    AnsiConsole.MarkupLine($"parsed: [green]{parsed}[/]");
 
     return true;
+}
+
+static bool TryExecuteCommand(string input, List<ICommand> commands)
+{
+    var command = commands.FirstOrDefault(com => input == com.Name || com.Aliases.Contains(input));
+    if (command != null) 
+    {
+        command.Execute();
+        return true;
+    }
+
+    return false;
 }

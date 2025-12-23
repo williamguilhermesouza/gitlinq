@@ -43,22 +43,10 @@ namespace GitLinq
         private static readonly Parser<BaseNode> ExpressionParser =
             Call.Or(MemberAccess).Or(IdNode).Or(StringLiteral.Select(s => (BaseNode)new StringLiteralNode(s)));
 
-        public static string ParseExpression(string inputExpression)
+        public static BaseNode ParseExpression(string inputExpression)
         {
             var rootNode = ExpressionParser.Parse(inputExpression);
-
-            var result = rootNode.ToString();
-            if (rootNode is MethodCallNode man)
-            {
-                result = "target " + man.Target.ToString() + "method " + man.Method;
-                var argn = 0;
-
-                foreach (var a in man.Arguments)
-                {
-                    result += $"arg{argn} " + a.ToString();
-                }
-            }
-            return result;
+            return rootNode;
         }
 
     }
