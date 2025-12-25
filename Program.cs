@@ -42,9 +42,9 @@ while (Prompt(out string input))
         // if (input == "Commits")
         // {
         var commits = gitService.GetCommits();
-        var expression = LinqExpressionBuilder.BuildExpression<Commit>(parsed);
-        var result = commits.AsQueryable().Where(expression).ToList();
-        commits = result;
+        // var expression = LinqExpressionBuilder.BuildExpression(parsed);
+        // var result = commits.AsQueryable().Where(expression).ToList();
+        // commits = result;
 
         var table = new Table();
         table.AddColumn("[green]Id[/]");
@@ -61,6 +61,7 @@ while (Prompt(out string input))
     catch (Exception ex)
     {
         AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+        Console.WriteLine(ex.StackTrace);
     }
 }
 
