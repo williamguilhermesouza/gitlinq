@@ -60,8 +60,8 @@ while (Prompt(out string input))
     }
     catch (Exception ex)
     {
-        AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-        Console.WriteLine(ex.StackTrace);
+        AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+        AnsiConsole.MarkupLine($"[red]Stack Trace:[/] {Markup.Escape(ex.StackTrace ?? string.Empty)}");
     }
 }
 
