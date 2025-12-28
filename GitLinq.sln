@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.5.002.0
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GitLinq", "GitLinq.csproj", "{670B6153-004A-491B-B2D8-E9FC37B98D53}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitLinq", "src\GitLinq.csproj", "{95012ADA-C36B-CB8F-C970-4899560BE2F3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "tests\Tests.csproj", "{9CF47860-2CEA-F379-09D8-9AEF27965D12}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +13,14 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{670B6153-004A-491B-B2D8-E9FC37B98D53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{670B6153-004A-491B-B2D8-E9FC37B98D53}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{670B6153-004A-491B-B2D8-E9FC37B98D53}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{670B6153-004A-491B-B2D8-E9FC37B98D53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95012ADA-C36B-CB8F-C970-4899560BE2F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95012ADA-C36B-CB8F-C970-4899560BE2F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95012ADA-C36B-CB8F-C970-4899560BE2F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95012ADA-C36B-CB8F-C970-4899560BE2F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CF47860-2CEA-F379-09D8-9AEF27965D12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CF47860-2CEA-F379-09D8-9AEF27965D12}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CF47860-2CEA-F379-09D8-9AEF27965D12}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CF47860-2CEA-F379-09D8-9AEF27965D12}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
