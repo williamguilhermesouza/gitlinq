@@ -41,7 +41,7 @@ namespace GitLinq
             select (BaseNode)new LambdaNode(param, body);
 
         private static readonly Parser<BaseNode> ExpressionParser =
-            Call.Or(MemberAccess).Or(IdNode).Or(StringLiteral.Select(s => (BaseNode)new StringLiteralNode(s)));
+            Call.Or(MemberAccess).Or(Lambda).Or(IdNode).Or(StringLiteral.Select(s => (BaseNode)new StringLiteralNode(s)));
 
         public static BaseNode ParseExpression(string inputExpression)
         {
