@@ -8,11 +8,11 @@ namespace GitLinq
         private static readonly Parser<string> Identifier =
             Parse.Letter.Or(Parse.Char('_')).AtLeastOnce().Text().Token();
 
-        private static readonly Parser<string> StringLiteral =
+        private static readonly Parser<BaseNode> StringLiteral =
             from open in Parse.Char('"')
             from content in Parse.CharExcept('"').Many().Text()
             from close in Parse.Char('"')
-            select content;
+            select (BaseNode) new StringLiteralNode(content);
 
         private static readonly Parser<BaseNode> IdNode =
             Identifier.Select(name => (BaseNode)new IdentifierNode(name));
@@ -41,7 +41,7 @@ namespace GitLinq
             select (BaseNode)new LambdaNode(param, body);
 
         private static readonly Parser<BaseNode> ExpressionParser =
-            Call.Or(MemberAccess).Or(Lambda).Or(IdNode).Or(StringLiteral.Select(s => (BaseNode)new StringLiteralNode(s)));
+            Call.Or(MemberAccess).Or(Lambda).Or(IdNode).Or(StringLiteral);
 
         public static BaseNode ParseExpression(string inputExpression)
         {
