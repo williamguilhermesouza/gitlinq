@@ -65,7 +65,7 @@ public class BaseTest
         
         var nodeTarget = memberTarget.Target as IdentifierNode;
         Assert.IsTrue(nodeTarget != null, "Error parsing member target");
-        Assert.IsTrue(nodeTarget.Name == "Commit", "Wrong target name");
+        Assert.IsTrue(nodeTarget.Name == "c", "Wrong target name");
         
         var nodeMember = memberTarget.Member;
         Assert.IsTrue(nodeMember != null, "Error parsing member");

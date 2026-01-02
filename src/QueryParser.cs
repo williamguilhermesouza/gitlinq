@@ -15,7 +15,7 @@ namespace GitLinq
             select (BaseNode) new StringLiteralNode(content);
 
         private static readonly Parser<BaseNode> IdNode =
-            Identifier.Select(name => (BaseNode)new IdentifierNode(name));
+            Identifier.Select(BaseNode (name) => new IdentifierNode(name));
 
         private static readonly Parser<BaseNode> MemberAccess =
             from target in IdNode
@@ -24,11 +24,11 @@ namespace GitLinq
             select (BaseNode)new MemberAccessNode(target, member);
 
         private static readonly Parser<BaseNode> Call =
-            from target in IdNode
+            from target in MemberAccess.Or(IdNode)
             from dot in Parse.Char('.')
             from method in Identifier
             from lparen in Parse.Char('(')
-            from args in Lambda.Or(ExpressionParser).DelimitedBy(Parse.Char(',').Token()).Optional()
+            from args in Parse.Ref(() => ExpressionParser).DelimitedBy(Parse.Char(',').Token()).Optional()
             from rparen in Parse.Char(')')
             select (BaseNode)new MethodCallNode(target, method, [..args.GetOrElse([])]);
 
@@ -41,7 +41,7 @@ namespace GitLinq
             select (BaseNode)new LambdaNode(param, body);
 
         private static readonly Parser<BaseNode> ExpressionParser =
-            Call.Or(MemberAccess).Or(Lambda).Or(IdNode).Or(StringLiteral);
+            Lambda.Or(Call).Or(MemberAccess).Or(IdNode).Or(StringLiteral);
 
         public static BaseNode ParseExpression(string inputExpression)
         {
