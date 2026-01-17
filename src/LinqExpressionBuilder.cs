@@ -9,10 +9,21 @@ public class LinqExpressionBuilder
 {
     private readonly Dictionary<string, ParameterExpression> _parameters = new();
     private readonly string _repositoryPath;
+    private readonly List<CommitInfo>? _testCommits;
 
     public LinqExpressionBuilder(string? repositoryPath = null)
     {
         _repositoryPath = repositoryPath ?? Directory.GetCurrentDirectory();
+        _testCommits = null;
+    }
+
+    /// <summary>
+    /// Constructor for testing with mock commit data.
+    /// </summary>
+    public LinqExpressionBuilder(List<CommitInfo> testCommits)
+    {
+        _repositoryPath = "";
+        _testCommits = testCommits;
     }
 
     /// <summary>
@@ -40,6 +51,7 @@ public class LinqExpressionBuilder
         return node switch
         {
             StringLiteralNode stringLiteralNode => BuildStringLiteral(stringLiteralNode),
+            NumberLiteralNode numberLiteralNode => BuildNumberLiteral(numberLiteralNode),
             IdentifierNode identifierNode => BuildIdentifier(identifierNode),
             MemberAccessNode memberAccessNode => BuildMemberAccess(memberAccessNode),
             MethodCallNode methodCallNode => BuildMethodCall(methodCallNode),
@@ -49,6 +61,11 @@ public class LinqExpressionBuilder
     }
 
     private Expression BuildStringLiteral(StringLiteralNode node)
+    {
+        return Expression.Constant(node.Value);
+    }
+
+    private Expression BuildNumberLiteral(NumberLiteralNode node)
     {
         return Expression.Constant(node.Value);
     }
@@ -71,6 +88,9 @@ public class LinqExpressionBuilder
 
     private List<CommitInfo> GetCommits()
     {
+        if (_testCommits != null)
+            return _testCommits;
+            
         var gitRoot = GitService.FindGitRoot(_repositoryPath) ?? _repositoryPath;
         return new GitService(gitRoot).GetCommits();
     }
@@ -242,8 +262,11 @@ public class LinqExpressionBuilder
         if (arguments[0] is not LambdaExpression predicate)
             throw new ArgumentException("FirstOrDefault with arguments requires a lambda predicate");
 
+        // Find the overload that takes a predicate (Func<T, bool>), not a default value
         firstOrDefaultMethod = typeof(Enumerable).GetMethods()
-            .First(m => m.Name == "FirstOrDefault" && m.GetParameters().Length == 2)
+            .First(m => m.Name == "FirstOrDefault" 
+                        && m.GetParameters().Length == 2 
+                        && m.GetParameters()[1].ParameterType.Name.StartsWith("Func"))
             .MakeGenericMethod(elementType);
 
         return Expression.Call(firstOrDefaultMethod, source, predicate);

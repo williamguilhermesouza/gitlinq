@@ -14,6 +14,10 @@ namespace GitLinq
             from close in Parse.Char('"')
             select (BaseNode) new StringLiteralNode(content);
 
+        private static readonly Parser<BaseNode> NumberLiteral =
+            from digits in Parse.Digit.AtLeastOnce().Text().Token()
+            select (BaseNode) new NumberLiteralNode(int.Parse(digits));
+
         private static readonly Parser<BaseNode> IdNode =
             Identifier.Select(BaseNode (name) => new IdentifierNode(name));
 
@@ -43,9 +47,9 @@ namespace GitLinq
         private static readonly Parser<Func<BaseNode, BaseNode>> Suffix =
             MethodCallSuffix.Or(MemberAccessSuffix);
 
-        // Parse a primary expression (identifier or string literal) followed by zero or more suffixes
+        // Parse a primary expression (identifier, string literal, or number) followed by zero or more suffixes
         private static readonly Parser<BaseNode> ChainedExpression =
-            from primary in IdNode.Or(StringLiteral)
+            from primary in IdNode.Or(StringLiteral).Or(NumberLiteral)
             from suffixes in Suffix.Many()
             select suffixes.Aggregate(primary, (current, suffix) => suffix(current));
 
