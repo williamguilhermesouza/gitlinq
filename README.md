@@ -6,6 +6,8 @@
 
 Query your Git commit history using LINQ-like syntax directly from the command line.
 
+![GitLinq Demo](demo.gif)
+
 ## Features
 
 - 🔍 **LINQ-like Query Syntax** - Use familiar C# LINQ methods to query commits
