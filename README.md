@@ -1,0 +1,244 @@
+# GitLinq
+
+[![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Query your Git commit history using LINQ-like syntax directly from the command line.
+
+![GitLinq Demo](https://via.placeholder.com/800x400?text=GitLinq+Demo)
+
+## Features
+
+- 🔍 **LINQ-like Query Syntax** - Use familiar C# LINQ methods to query commits
+- 🎯 **Interactive Mode** - REPL with autocomplete and command history
+- ⚡ **CLI Mode** - Execute single queries for scripting and automation
+- 📊 **Rich Output** - Beautiful tables powered by Spectre.Console
+- 🔧 **Extensible Commands** - Built-in help, examples, and history commands
+
+## Installation
+
+### Prerequisites
+
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+
+### Build from Source
+
+```bash
+git clone https://github.com/yourusername/gitlinq.git
+cd gitlinq
+dotnet build
+```
+
+### Run
+
+```bash
+cd src
+dotnet run
+```
+
+Or build and install as a global tool:
+
+```bash
+dotnet pack
+dotnet tool install --global --add-source ./nupkg GitLinq
+```
+
+## Usage
+
+### Interactive Mode
+
+Simply run `gitlinq` inside any Git repository:
+
+```bash
+gitlinq
+```
+
+You'll enter an interactive REPL where you can type queries:
+
+```
+GitLinq - Query git commits using LINQ-like syntax
+Type 'help' for available commands or enter a query.
+
+gitlinq> Commits.Take(5)
+```
+
+### Command Line Mode
+
+Execute a single query and exit:
+
+```bash
+gitlinq -q "Commits.Take(10)"
+gitlinq --query "Commits.Where(c => c.Message.Contains(\"fix\"))"
+```
+
+### Command Line Options
+
+| Option | Description |
+|--------|-------------|
+| `-q, --query <query>` | Execute a single query and exit |
+| `-h, --help` | Show help message |
+
+## Query Syntax
+
+GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate commits.
+
+### Available Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Sha` | string | Full commit SHA hash |
+| `Message` | string | Full commit message |
+| `MessageShort` | string | First line of commit message |
+| `AuthorName` | string | Author's name |
+| `AuthorEmail` | string | Author's email |
+| `AuthorWhen` | DateTimeOffset | Author timestamp |
+
+### Supported Methods
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `Take(n)` | Get first n commits | `Commits.Take(10)` |
+| `Skip(n)` | Skip first n commits | `Commits.Skip(5)` |
+| `First()` | Get first commit | `Commits.First()` |
+| `First(predicate)` | Get first matching commit | `Commits.First(c => c.Message.Contains("fix"))` |
+| `FirstOrDefault()` | Get first commit or null | `Commits.FirstOrDefault()` |
+| `FirstOrDefault(predicate)` | Get first matching or null | `Commits.FirstOrDefault(c => c.AuthorName.Contains("Alice"))` |
+| `Where(predicate)` | Filter commits | `Commits.Where(c => c.Message.Contains("feat"))` |
+| `Select(selector)` | Project commits | `Commits.Select(c => c.Message)` |
+| `OrderBy(selector)` | Sort ascending | `Commits.OrderBy(c => c.AuthorName)` |
+| `OrderByDescending(selector)` | Sort descending | `Commits.OrderByDescending(c => c.AuthorWhen)` |
+| `Count()` | Count all commits | `Commits.Count()` |
+| `Count(predicate)` | Count matching commits | `Commits.Count(c => c.AuthorName.Contains("Bob"))` |
+| `Any()` | Check if commits exist | `Commits.Any()` |
+| `Any(predicate)` | Check if any match | `Commits.Any(c => c.Message.Contains("hotfix"))` |
+
+### String Methods in Predicates
+
+| Method | Example |
+|--------|---------|
+| `Contains(text)` | `c.Message.Contains("fix")` |
+| `StartsWith(text)` | `c.Message.StartsWith("feat")` |
+| `EndsWith(text)` | `c.Message.EndsWith("!")` |
+
+## Example Queries
+
+```bash
+# Get all commits
+Commits
+
+# Get the first 10 commits
+Commits.Take(10)
+
+# Pagination: skip 5, take 10
+Commits.Skip(5).Take(10)
+
+# Get the most recent commit
+Commits.First()
+
+# Count total commits
+Commits.Count()
+
+# Find commits with 'fix' in message
+Commits.Where(c => c.Message.Contains("fix"))
+
+# Find commits by author
+Commits.Where(c => c.AuthorName.Contains("Alice"))
+
+# Find commits starting with 'feat' (conventional commits)
+Commits.Where(c => c.Message.StartsWith("feat"))
+
+# Find first commit mentioning 'bug'
+Commits.First(c => c.Message.Contains("bug"))
+
+# Check if any hotfix commits exist
+Commits.Any(c => c.Message.Contains("hotfix"))
+
+# Count commits by a specific author
+Commits.Count(c => c.AuthorName.Contains("Bob"))
+
+# Chain multiple operations
+Commits.Where(c => c.AuthorName.Contains("Alice")).Take(5)
+```
+
+## Interactive Commands
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `help` | `h`, `?` | Show available commands |
+| `examples` | `ex`, `samples` | Show example queries |
+| `history` | `hist` | Show command history |
+| `clear` | `cls` | Clear the screen |
+| `exit` | `quit`, `q` | Exit GitLinq |
+
+## Architecture
+
+```
+src/
+├── Program.cs              # Entry point, CLI handling
+├── QueryParser.cs          # Sprache-based LINQ parser
+├── LinqExpressionBuilder.cs # AST to LINQ Expression converter
+├── AutoCompletionHandler.cs # Tab completion for REPL
+├── AST/                    # Abstract Syntax Tree nodes
+│   ├── BaseNode.cs
+│   ├── IdentifierNode.cs
+│   ├── StringLiteralNode.cs
+│   ├── NumberLiteralNode.cs
+│   ├── MemberAccessNode.cs
+│   ├── MethodCallNode.cs
+│   ├── LambdaNode.cs
+│   └── BinaryNode.cs
+├── Commands/               # Interactive command system
+│   ├── ICommand.cs
+│   ├── CommandRegistry.cs
+│   ├── CommandContext.cs
+│   └── ...
+└── Services/
+    └── GitService.cs       # Git repository operations
+```
+
+## Dependencies
+
+- [LibGit2Sharp](https://github.com/libgit2/libgit2sharp) - Git repository access
+- [Sprache](https://github.com/sprache/Sprache) - Parser combinator library
+- [Spectre.Console](https://github.com/spectreconsole/spectre.console) - Beautiful console output
+- [ReadLine](https://github.com/tonerdo/readline) - GNU Readline-like input with history
+
+## Development
+
+### Running Tests
+
+```bash
+dotnet test
+```
+
+### Project Structure
+
+- `src/` - Main application source code
+- `tests/` - Unit tests for parser and expression builder
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Roadmap
+
+- [ ] Support for branches and tags queries
+- [ ] Date range filtering (`c.AuthorWhen > "2024-01-01"`)
+- [ ] File change statistics per commit
+- [ ] Export results to JSON/CSV
+- [ ] Configuration file support
+- [ ] More LINQ methods (`Last`, `Single`, `Distinct`, `GroupBy`)
+
+---
+
+Made with ❤️ using .NET 8.0
