@@ -6,7 +6,9 @@
 
 Query your Git commit history using LINQ-like syntax directly from the command line.
 
-![GitLinq Demo](demo.gif)
+<p align="center">
+  <img src="demo.gif" alt="GitLinq Demo" width="600">
+</p>
 
 ## Features
 
