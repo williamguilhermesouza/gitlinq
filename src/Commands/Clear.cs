@@ -1,9 +1,13 @@
 namespace GitLinq.Commands;
 
-public class Clear : ICommand
+public class ClearCommand : ICommand
 {
     public string Name => "clear";
-    public string Description => "Clear the command line";
+    public string Description => "Clear the console screen";
     public IReadOnlyList<string> Aliases => ["cls"];
-    public void Execute() => Console.Clear();
+    
+    public void Execute(string[] args, CommandContext context)
+    {
+        Console.Clear();
+    }
 }

@@ -3,92 +3,167 @@ using GitLinq.Commands;
 using GitLinq.Services;
 using Spectre.Console;
 
-ReadLine.HistoryEnabled = true;
-ReadLine.AutoCompletionHandler = new AutoCompletionHandler();
-var commands = new List<ICommand>
-{
-    new Clear()
-};
-
-var currentDirectory = Directory.GetCurrentDirectory();
-var gitRoot = GitService.FindGitRoot(currentDirectory);
+var gitRoot = GitService.FindGitRoot(Directory.GetCurrentDirectory());
 
 if (gitRoot == null)
-    throw new InvalidOperationException("Not inside a Git repository");
+{
+    AnsiConsole.MarkupLine("[red]Error:[/] Not inside a Git repository");
+    return 1;
+}
 
 var expressionBuilder = new LinqExpressionBuilder(gitRoot);
 
-while (Prompt(out string input))
+// Handle command line arguments
+if (args.Length > 0)
+    return HandleCommandLineArgs(args);
+
+// Interactive mode
+RunInteractiveMode();
+return 0;
+
+int HandleCommandLineArgs(string[] cliArgs)
 {
-    if (string.IsNullOrEmpty(input))
-        continue;
+    string? query = null;
+    var showHelp = false;
+    var hasError = false;
 
-    if (input.Equals("exit", StringComparison.OrdinalIgnoreCase))
-        break;
+    for (var i = 0; i < cliArgs.Length; i++)
+    {
+        switch (cliArgs[i])
+        {
+            case "-q" or "--query" when i + 1 < cliArgs.Length:
+                query = cliArgs[++i];
+                break;
+            case "-q" or "--query":
+                AnsiConsole.MarkupLine("[red]Error:[/] -q/--query requires a query argument");
+                return 1;
+            case "-h" or "--help":
+                showHelp = true;
+                break;
+            default:
+                AnsiConsole.MarkupLine($"[red]Error:[/] Unknown argument: {Markup.Escape(cliArgs[i])}");
+                hasError = true;
+                break;
+        }
+    }
 
-    if (TryExecuteCommand(input, commands))
-        continue;
+    if (showHelp || hasError)
+    {
+        PrintHelp();
+        return hasError ? 1 : 0;
+    }
 
+    if (query == null) return 0;
+    
+    return ExecuteQuery(query) ? 0 : 1;
+}
+
+void RunInteractiveMode()
+{
+    ReadLine.HistoryEnabled = true;
+    ReadLine.AutoCompletionHandler = new AutoCompletionHandler();
+
+    var commands = new CommandRegistry().DiscoverCommands();
+    var context = new CommandContext
+    {
+        ExpressionBuilder = expressionBuilder,
+        Commands = commands,
+        DisplayResult = DisplayResult
+    };
+
+    AnsiConsole.MarkupLine("[bold]GitLinq[/] - Query git commits using LINQ-like syntax");
+    AnsiConsole.MarkupLine("[dim]Type 'help' for available commands or enter a query.[/]\n");
+
+    while (!context.ShouldExit)
+    {
+        var input = ReadLine.Read("gitlinq> ");
+        
+        if (string.IsNullOrWhiteSpace(input))
+            continue;
+
+        if (!commands.TryExecute(input, context))
+            ExecuteQuery(input);
+    }
+}
+
+bool ExecuteQuery(string query)
+{
     try
     {
-        // Parse the input into an AST
-        var ast = QueryParser.ParseExpression(input);
-        
-        // Execute the query
+        var ast = QueryParser.ParseExpression(query);
         var result = expressionBuilder.Execute(ast);
-        
-        // Handle different result types
         DisplayResult(result);
+        return true;
     }
     catch (Exception ex)
     {
         AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+        return false;
     }
 }
 
-return;
+void PrintHelp()
+{
+    AnsiConsole.Write(new Panel(
+        new Rows(
+            new Markup("[bold]Usage:[/]"),
+            new Text("  gitlinq                      Start interactive mode"),
+            new Text("  gitlinq -q <query>           Execute a single query and exit"),
+            new Text("  gitlinq -h, --help           Show this help message"),
+            Text.Empty,
+            new Markup("[bold]Examples:[/]"),
+            new Text("  gitlinq -q \"Commits.Take(10)\""),
+            new Text("  gitlinq -q \"Commits.Where(c => c.Message.Contains(\\\"fix\\\"))\""),
+            new Text("  gitlinq -q \"Commits.Count()\"")
+        ))
+    {
+        Header = new PanelHeader("[bold]GitLinq[/] - Query git commits using LINQ-like syntax"),
+        Border = BoxBorder.Rounded,
+        Padding = new Padding(2, 1)
+    });
+}
 
-static void DisplayResult(object? result)
+void DisplayResult(object? result)
 {
     switch (result)
     {
         case null:
             AnsiConsole.MarkupLine("[dim](null)[/]");
             break;
-            
         case IEnumerable<CommitInfo> commits:
             DisplayCommitsTable(commits);
             break;
-            
         case CommitInfo commit:
             DisplayCommitsTable([commit]);
             break;
-            
-        case int count:
-            AnsiConsole.MarkupLine($"[green]{count}[/]");
+        case int or long or bool:
+            var color = result is bool b ? (b ? "green" : "red") : "green";
+            AnsiConsole.MarkupLine($"[{color}]{result}[/]");
             break;
-            
-        case bool value:
-            AnsiConsole.MarkupLine(value ? "[green]true[/]" : "[red]false[/]");
-            break;
-            
         default:
             AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(result.ToString() ?? "")}[/]");
             break;
     }
 }
 
-static void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
+void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
 {
-    var table = new Table();
-    table.Border(TableBorder.Rounded);
-    table.AddColumn(new TableColumn("[green]SHA[/]").Width(10));
-    table.AddColumn(new TableColumn("[blue]Author[/]").Width(20));
-    table.AddColumn(new TableColumn("[yellow]Date[/]").Width(20));
-    table.AddColumn("Message");
+    var commitList = commits.ToList();
+    
+    if (commitList.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[dim]No commits found.[/]");
+        return;
+    }
 
-    var count = 0;
-    foreach (var commit in commits)
+    var table = new Table()
+        .Border(TableBorder.Rounded)
+        .AddColumn(new TableColumn("[green]SHA[/]").Width(10))
+        .AddColumn(new TableColumn("[blue]Author[/]").Width(20))
+        .AddColumn(new TableColumn("[yellow]Date[/]").Width(20))
+        .AddColumn("Message");
+
+    foreach (var commit in commitList)
     {
         table.AddRow(
             Markup.Escape(commit.Sha[..7]),
@@ -96,29 +171,8 @@ static void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
             commit.AuthorWhen.ToString("yyyy-MM-dd HH:mm"),
             Markup.Escape(commit.MessageShort)
         );
-        count++;
     }
 
     AnsiConsole.Write(table);
-    AnsiConsole.MarkupLine($"[dim]({count} commits)[/]");
-}
-
-static bool Prompt(out string input)
-{
-    var text = ReadLine.Read("gitlinq> ");
-    input = text;
-
-    return true;
-}
-
-static bool TryExecuteCommand(string input, List<ICommand> commands)
-{
-    var command = commands.FirstOrDefault(com => input == com.Name || com.Aliases.Contains(input));
-    if (command != null)
-    {
-        command.Execute();
-        return true;
-    }
-
-    return false;
+    AnsiConsole.MarkupLine($"[dim]({commitList.Count} commit{(commitList.Count != 1 ? "s" : "")})[/]");
 }
