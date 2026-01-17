@@ -5,7 +5,26 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    
+    <!-- .NET Tool Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>gitlinq</ToolCommandName>
+    
+    <!-- NuGet Package Metadata -->
+    <PackageId>GitLinq</PackageId>
+    <Version>0.0.1</Version>
+    <Authors>Your Name</Authors>
+    <Description>Query your Git commit history using LINQ-like syntax from the command line</Description>
+    <PackageProjectUrl>https://github.com/williamguilhermesouza/gitlinq</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/williamguilhermesouza/gitlinq</RepositoryUrl>
+    <PackageTags>git;linq;cli;dotnet-tool</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="/"/>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
