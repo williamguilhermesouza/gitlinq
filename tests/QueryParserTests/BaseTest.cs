@@ -87,9 +87,9 @@ public class BaseTest
         Assert.IsTrue(methodCallNode != null, $"Error parsing method call node: {root.GetType()}");
         Assert.AreEqual(methodCallNode.Method, "Where", $"Wrong method call name: {methodCallNode.Method}");
 
-        var target = methodCallNode.Target as StringLiteralNode;
+        var target = methodCallNode.Target as IdentifierNode;
         Assert.IsTrue(target != null, $"Error parsing target node: {methodCallNode.Target.GetType()}");
-        Assert.AreEqual(target.Value, "Commits", $"Wrong target node value: {target.Value}");
+        Assert.AreEqual(target.Name, "Commits", $"Wrong target node value: {target.Name}");
 
         var argument = methodCallNode.Arguments.FirstOrDefault() as LambdaNode;
         Assert.IsTrue(argument != null, $"Error parsing lambda node: {methodCallNode.Arguments.FirstOrDefault()?.GetType()}");
@@ -107,8 +107,8 @@ public class BaseTest
         Assert.IsTrue(lambdaTarget != null, $"Error parsing lambda member access target node: {body.Target.GetType()}");
         Assert.AreEqual(lambdaTarget.Member, "Message", $"Wrong lambda member access method value: {lambdaTarget.Member}");
 
-        var memberAccessTarget = lambdaTarget.Target as StringLiteralNode;
+        var memberAccessTarget = lambdaTarget.Target as IdentifierNode;
         Assert.IsTrue(memberAccessTarget != null, $"Error lambda member access arg node: {lambdaTarget.Target.GetType()}");
-        Assert.AreEqual(memberAccessTarget.Value, "c", $"Wrong lambda member access arg node value: {memberAccessTarget.Value}");
+        Assert.AreEqual(memberAccessTarget.Name, "c", $"Wrong lambda member access arg node value: {memberAccessTarget.Name}");
     }
 }
