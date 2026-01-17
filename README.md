@@ -1,11 +1,10 @@
 # GitLinq
 
 [![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+[![NuGet](https://img.shields.io/nuget/v/GitLinq)](https://www.nuget.org/packages/GitLinq)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Query your Git commit history using LINQ-like syntax directly from the command line.
-
-![GitLinq Demo](https://via.placeholder.com/800x400?text=GitLinq+Demo)
 
 ## Features
 
@@ -21,26 +20,27 @@ Query your Git commit history using LINQ-like syntax directly from the command l
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 
+### Install from NuGet (Recommended)
+
+```bash
+dotnet tool install --global GitLinq
+```
+
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/gitlinq.git
-cd gitlinq
+git clone https://github.com/williamguilhermesouza/gitlinq.git
+cd gitlinq/src
 dotnet build
-```
-
-### Run
-
-```bash
-cd src
 dotnet run
 ```
 
-Or build and install as a global tool:
+### Install from Source as Global Tool
 
 ```bash
-dotnet pack
-dotnet tool install --global --add-source ./nupkg GitLinq
+cd src
+dotnet pack -c Release
+dotnet tool install --global --add-source ./bin/Release GitLinq
 ```
 
 ## Usage
@@ -241,4 +241,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Made with ❤️ using .NET 8.0
+Made with ❤️ by [William Guilherme](https://github.com/williamguilhermesouza) using .NET 8.0
