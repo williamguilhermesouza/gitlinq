@@ -30,8 +30,8 @@ namespace GitLinq.Services
             return repository.Commits.Select(c => new CommitInfo
             {
                 Sha = c.Sha,
-                Message = c.Message,
-                MessageShort = c.MessageShort,
+                Message = c.Message.TrimEnd(),
+                MessageShort = c.MessageShort.TrimEnd(),
                 AuthorName = c.Author.Name,
                 AuthorEmail = c.Author.Email,
                 AuthorWhen = c.Author.When,

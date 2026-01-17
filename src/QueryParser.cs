@@ -8,10 +8,20 @@ namespace GitLinq
         private static readonly Parser<string> Identifier =
             Parse.Letter.Or(Parse.Char('_')).AtLeastOnce().Text().Token();
 
+        // Support both standard quotes and smart/curly quotes (Windows terminal compatibility)
+        private static readonly Parser<char> OpenQuote = 
+            Parse.Chars('"', '"', '„');  // Standard, left curly, low-9 quote
+        
+        private static readonly Parser<char> CloseQuote = 
+            Parse.Chars('"', '"', '"');  // Standard, right curly, left curly (for mismatched pairs)
+        
+        private static readonly Parser<char> AnyQuote = 
+            Parse.Chars('"', '"', '"', '„');
+
         private static readonly Parser<BaseNode> StringLiteral =
-            from open in Parse.Char('"')
-            from content in Parse.CharExcept('"').Many().Text()
-            from close in Parse.Char('"')
+            from open in OpenQuote
+            from content in Parse.CharExcept(c => AnyQuote.TryParse(c.ToString()).WasSuccessful, "non-quote").Many().Text()
+            from close in CloseQuote
             select (BaseNode) new StringLiteralNode(content);
 
         private static readonly Parser<BaseNode> NumberLiteral =
