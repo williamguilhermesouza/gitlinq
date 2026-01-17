@@ -2,9 +2,6 @@
 using GitLinq.Commands;
 using GitLinq.Services;
 using Spectre.Console;
-using LibGit2Sharp;
-using GitLinq.AST;
-using System.Linq.Expressions;
 
 ReadLine.HistoryEnabled = true;
 ReadLine.AutoCompletionHandler = new AutoCompletionHandler();
@@ -19,7 +16,7 @@ var gitRoot = GitService.FindGitRoot(currentDirectory);
 if (gitRoot == null)
     throw new InvalidOperationException("Not inside a Git repository");
 
-var gitService = new GitService(gitRoot);
+var expressionBuilder = new LinqExpressionBuilder(gitRoot);
 
 while (Prompt(out string input))
 {
@@ -34,38 +31,77 @@ while (Prompt(out string input))
 
     try
     {
-
-        var parsed = QueryParser.ParseExpression(input);
-        PrintNode(parsed);
-        // AnsiConsole.MarkupLine($"parsed: [green]{parsed}[/]");
-
-        // if (input == "Commits")
-        // {
-        var commits = gitService.GetCommits();
-        // var expression = LinqExpressionBuilder.BuildExpression(parsed);
-        // var result = commits.AsQueryable().Where(expression).ToList();
-        // commits = result;
-
-        var table = new Table();
-        table.AddColumn("[green]Id[/]");
-        table.AddColumn("Message");
-
-        foreach (var commit in commits)
-        {
-            table.AddRow($"{commit.Id}", $"{commit.Message}");
-        }
-
-        AnsiConsole.Write(table);
-        // }
+        // Parse the input into an AST
+        var ast = QueryParser.ParseExpression(input);
+        
+        // Execute the query
+        var result = expressionBuilder.Execute(ast);
+        
+        // Handle different result types
+        DisplayResult(result);
     }
     catch (Exception ex)
     {
         AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-        AnsiConsole.MarkupLine($"[red]Stack Trace:[/] {Markup.Escape(ex.StackTrace ?? string.Empty)}");
     }
 }
 
 return;
+
+static void DisplayResult(object? result)
+{
+    switch (result)
+    {
+        case null:
+            AnsiConsole.MarkupLine("[dim](null)[/]");
+            break;
+            
+        case IEnumerable<CommitInfo> commits:
+            DisplayCommitsTable(commits);
+            break;
+            
+        case CommitInfo commit:
+            DisplayCommitsTable([commit]);
+            break;
+            
+        case int count:
+            AnsiConsole.MarkupLine($"[green]{count}[/]");
+            break;
+            
+        case bool value:
+            AnsiConsole.MarkupLine(value ? "[green]true[/]" : "[red]false[/]");
+            break;
+            
+        default:
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(result.ToString() ?? "")}[/]");
+            break;
+    }
+}
+
+static void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
+{
+    var table = new Table();
+    table.Border(TableBorder.Rounded);
+    table.AddColumn(new TableColumn("[green]SHA[/]").Width(10));
+    table.AddColumn(new TableColumn("[blue]Author[/]").Width(20));
+    table.AddColumn(new TableColumn("[yellow]Date[/]").Width(20));
+    table.AddColumn("Message");
+
+    var count = 0;
+    foreach (var commit in commits)
+    {
+        table.AddRow(
+            Markup.Escape(commit.Sha[..7]),
+            Markup.Escape(commit.AuthorName),
+            commit.AuthorWhen.ToString("yyyy-MM-dd HH:mm"),
+            Markup.Escape(commit.MessageShort)
+        );
+        count++;
+    }
+
+    AnsiConsole.Write(table);
+    AnsiConsole.MarkupLine($"[dim]({count} commits)[/]");
+}
 
 static bool Prompt(out string input)
 {
@@ -85,35 +121,4 @@ static bool TryExecuteCommand(string input, List<ICommand> commands)
     }
 
     return false;
-}
-
-static void PrintNode(BaseNode parsed)
-{
-    if (parsed is IdentifierNode id)
-    {
-        AnsiConsole.MarkupLine($"Identifier: [green]{id.Name}[/]");
-    }
-    else if (parsed is MemberAccessNode member)
-    {
-        AnsiConsole.MarkupLine($"Member Access: [green]{member.Member}[/]");
-        PrintNode(member.Target);
-    }
-    else if (parsed is StringLiteralNode str)
-    {
-        AnsiConsole.MarkupLine($"String Literal: [green]{str.Value}[/]");
-    }
-    else if (parsed is MethodCallNode call)
-    {
-        AnsiConsole.MarkupLine($"Method Call: [green]{call.Method}[/]");
-        PrintNode(call.Target);
-        foreach (var arg in call.Arguments)
-        {
-            PrintNode(arg);
-        }
-    }
-    else if (parsed is LambdaNode lambda)
-    {
-        AnsiConsole.MarkupLine($"Lambda: [green]{lambda.Parameter}[/]");
-        PrintNode(lambda.Body);
-    }
 }
