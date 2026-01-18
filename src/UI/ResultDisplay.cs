@@ -245,26 +245,46 @@ public static class ResultDisplay
                 var parenStart = query.IndexOf('(', index);
                 if (parenStart >= 0)
                 {
-                    // Try double quotes first
-                    var doubleQuoteStart = query.IndexOf('"', parenStart);
-                    if (doubleQuoteStart >= 0)
+                    // Determine which quote type appears first after the opening parenthesis
+                    var searchStart = parenStart + 1;
+                    var doubleQuoteStart = query.IndexOf('"', searchStart);
+                    var singleQuoteStart = query.IndexOf('\'', searchStart);
+
+                    int quoteStart;
+                    char quoteChar;
+
+                    if (doubleQuoteStart >= 0 && singleQuoteStart >= 0)
                     {
-                        var doubleQuoteEnd = query.IndexOf('"', doubleQuoteStart + 1);
-                        if (doubleQuoteEnd > doubleQuoteStart)
+                        if (doubleQuoteStart < singleQuoteStart)
                         {
-                            return query[(doubleQuoteStart + 1)..doubleQuoteEnd];
+                            quoteStart = doubleQuoteStart;
+                            quoteChar = '"';
+                        }
+                        else
+                        {
+                            quoteStart = singleQuoteStart;
+                            quoteChar = '\'';
                         }
                     }
-                    
-                    // Try single quotes
-                    var singleQuoteStart = query.IndexOf('\'', parenStart);
-                    if (singleQuoteStart >= 0)
+                    else if (doubleQuoteStart >= 0)
                     {
-                        var singleQuoteEnd = query.IndexOf('\'', singleQuoteStart + 1);
-                        if (singleQuoteEnd > singleQuoteStart)
-                        {
-                            return query[(singleQuoteStart + 1)..singleQuoteEnd];
-                        }
+                        quoteStart = doubleQuoteStart;
+                        quoteChar = '"';
+                    }
+                    else if (singleQuoteStart >= 0)
+                    {
+                        quoteStart = singleQuoteStart;
+                        quoteChar = '\'';
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    var quoteEnd = query.IndexOf(quoteChar, quoteStart + 1);
+                    if (quoteEnd > quoteStart)
+                    {
+                        return query[(quoteStart + 1)..quoteEnd];
                     }
                 }
             }
