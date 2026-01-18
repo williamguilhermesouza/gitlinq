@@ -92,7 +92,13 @@ gitlinq --query "Commits.Where(c => c.Message.Contains(\"fix\"))"
 
 GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate commits.
 
-### Available Properties
+### Data Sources
+
+| Source | Description |
+|--------|-------------|
+| `Commits` | Full commit information including diff data via the `Diff` property |
+
+### Commits Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -102,6 +108,37 @@ GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate co
 | `AuthorName` | string | Author's name |
 | `AuthorEmail` | string | Author's email |
 | `AuthorWhen` | DateTimeOffset | Author timestamp |
+| `Diff` | DiffData | File changes, lines added/deleted for this commit |
+
+### Diff Property (DiffData)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Files` | List&lt;FileChange&gt; | List of changed files |
+| `TotalLinesAdded` | int | Sum of lines added across all files |
+| `TotalLinesDeleted` | int | Sum of lines deleted across all files |
+| `FilesChanged` | int | Number of files changed |
+
+### FileChange Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Path` | string | File path |
+| `OldPath` | string? | Previous path (for renamed files) |
+| `Status` | string | Change type: Added, Deleted, Modified, Renamed |
+| `LinesAdded` | int | Lines added in this file |
+| `LinesDeleted` | int | Lines deleted in this file |
+| `IsBinary` | bool | Whether file is binary |
+| `AddedContent` | List&lt;string&gt; | Actual text lines that were added |
+| `DeletedContent` | List&lt;string&gt; | Actual text lines that were deleted |
+
+### FileChange Methods (for content searching)
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `AddedContains(text)` | Check if any added line contains text (case-insensitive) | `f.AddedContains("TODO")` |
+| `DeletedContains(text)` | Check if any deleted line contains text (case-insensitive) | `f.DeletedContains("bug")` |
+| `ContentContains(text)` | Check if any changed line (added or deleted) contains text | `f.ContentContains("password")` |
 
 ### Supported Methods
 
@@ -130,7 +167,20 @@ GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate co
 | `StartsWith(text)` | `c.Message.StartsWith("feat")` |
 | `EndsWith(text)` | `c.Message.EndsWith("!")` |
 
+### Comparison Operators in Predicates
+
+| Operator | Example |
+|----------|---------|
+| `>` | `d.FilesChanged > 5` |
+| `<` | `d.TotalLinesAdded < 100` |
+| `>=` | `d.FilesChanged >= 3` |
+| `<=` | `d.TotalLinesDeleted <= 10` |
+| `==` | `d.FilesChanged == 1` |
+| `!=` | `d.FilesChanged != 0` |
+
 ## Example Queries
+
+### Basic Commit Queries
 
 ```bash
 # Get all commits
@@ -170,6 +220,53 @@ Commits.Count(c => c.AuthorName.Contains("Bob"))
 Commits.Where(c => c.AuthorName.Contains("Alice")).Take(5)
 ```
 
+### Diff Queries (with file change statistics)
+
+```bash
+# Find commits that changed more than 5 files
+Commits.Where(c => c.Diff.FilesChanged > 5)
+
+# Find commits with more than 100 lines added
+Commits.Where(c => c.Diff.TotalLinesAdded > 100).Take(10)
+
+# Find commits with significant deletions
+Commits.Where(c => c.Diff.TotalLinesDeleted >= 50)
+
+# Get files changed in the most recent commit
+Commits.First().Diff.Files
+
+# Find single-file commits
+Commits.Where(c => c.Diff.FilesChanged == 1).Take(10)
+
+# Find large refactoring commits (many files, many changes)
+Commits.Where(c => c.Diff.FilesChanged >= 10).Take(5)
+
+# Combine commit message filtering with diff statistics
+Commits.Where(c => c.Message.Contains("refactor")).Where(c => c.Diff.FilesChanged > 3)
+```
+
+### Diff Content Queries (search actual code changes)
+
+```bash
+# Find commits that added a TODO comment
+Commits.Where(c => c.Diff.Files.Any(f => f.AddedContains("TODO")))
+
+# Find commits that removed code containing "bug"
+Commits.Where(c => c.Diff.Files.Any(f => f.DeletedContains("bug")))
+
+# Find commits that touched code containing "password" (added or deleted)
+Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains("password")))
+
+# Find commits that added "console.log" (for debugging cleanup)
+Commits.Where(c => c.Diff.Files.Any(f => f.AddedContains("console.log")))
+
+# Find commits where a specific function was modified
+Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains("myFunction")))
+
+# View the actual added lines in the most recent commit's first file
+Commits.First().Diff.Files.First().AddedContent
+```
+
 ## Interactive Commands
 
 | Command | Aliases | Description |
@@ -184,7 +281,7 @@ Commits.Where(c => c.AuthorName.Contains("Alice")).Take(5)
 
 ```
 src/
-├── Program.cs              # Entry point, CLI handling
+├── Program.cs              # Entry point, CLI handling, REPL loop
 ├── QueryParser.cs          # Sprache-based LINQ parser
 ├── LinqExpressionBuilder.cs # AST to LINQ Expression converter
 ├── AutoCompletionHandler.cs # Tab completion for REPL
@@ -200,10 +297,23 @@ src/
 ├── Commands/               # Interactive command system
 │   ├── ICommand.cs
 │   ├── CommandRegistry.cs
-│   ├── CommandContext.cs
-│   └── ...
-└── Services/
-    └── GitService.cs       # Git repository operations
+│   ├── HelpCommand.cs
+│   ├── ExamplesCommand.cs
+│   ├── HistoryCommand.cs
+│   ├── Clear.cs
+│   └── ExitCommand.cs
+├── Diagnostics/            # Debug and troubleshooting utilities
+│   └── DebugHelper.cs      # Environment info, terminal detection
+├── Models/                 # Domain models
+│   ├── CommitInfo.cs       # Git commit data
+│   ├── DiffData.cs         # Diff statistics and content search
+│   ├── FileChange.cs       # Individual file change data
+│   └── MatchedLine.cs      # Matched content with context
+├── Services/               # External service integrations
+│   └── GitService.cs       # Git repository operations (LibGit2Sharp)
+└── UI/                     # User interface components
+    ├── ResultDisplay.cs    # Query result rendering (tables, content)
+    └── HelpDisplay.cs      # CLI help output
 ```
 
 ## Dependencies
@@ -224,6 +334,12 @@ dotnet test
 ### Project Structure
 
 - `src/` - Main application source code
+  - `AST/` - Abstract Syntax Tree node types
+  - `Commands/` - REPL command implementations
+  - `Diagnostics/` - Debug and troubleshooting utilities
+  - `Models/` - Domain models (CommitInfo, DiffData, etc.)
+  - `Services/` - External integrations (Git via LibGit2Sharp)
+  - `UI/` - Display and rendering components
 - `tests/` - Unit tests for parser and expression builder
 
 ## Troubleshooting
@@ -278,4 +394,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Made with ❤️ by [William Guilherme](https://github.com/williamguilhermesouza) using .NET 8.0
+Made by [William Guilherme](https://github.com/williamguilhermesouza) using .NET 8.0

@@ -1,6 +1,6 @@
 using GitLinq;
 using GitLinq.AST;
-using GitLinq.Services;
+using GitLinq.Models;
 
 namespace Tests.LinqExpressionBuilderTests;
 

@@ -12,7 +12,7 @@ public class ExamplesCommand : ICommand
     {
         AnsiConsole.MarkupLine("[bold]Example Queries:[/]\n");
         
-        var examples = new (string Query, string Description)[]
+        var commitExamples = new (string Query, string Description)[]
         {
             ("Commits", "Get all commits"),
             ("Commits.Take(10)", "Get the first 10 commits"),
@@ -27,12 +27,44 @@ public class ExamplesCommand : ICommand
             ("Commits.Count(c => c.AuthorName.Contains(\"Bob\"))", "Count commits by Bob"),
         };
 
+        var diffExamples = new (string Query, string Description)[]
+        {
+            ("Commits.Where(c => c.Diff.FilesChanged > 5)", "Commits that changed more than 5 files"),
+            ("Commits.Where(c => c.Diff.TotalLinesAdded > 100)", "Commits with more than 100 lines added"),
+            ("Commits.Where(c => c.Diff.Files.Any(f => f.Path.Contains(\".cs\")))", "Commits that modified C# files"),
+            ("Commits.First().Diff.Files", "Get files changed in the most recent commit"),
+            ("Commits.Where(c => c.Diff.Files.Any(f => f.Status == \"Added\"))", "Commits that added new files"),
+        };
+
+        var diffContentExamples = new (string Query, string Description)[]
+        {
+            ("Commits.Where(c => c.Diff.Files.Any(f => f.AddedContains(\"TODO\")))", "Find commits that added 'TODO'"),
+            ("Commits.Where(c => c.Diff.Files.Any(f => f.DeletedContains(\"bug\")))", "Find commits that removed 'bug'"),
+            ("Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains(\"password\")))", "Find commits that touched 'password'"),
+            ("Commits.First().Diff.Files.First().AddedContent", "View added lines in most recent file change"),
+        };
+
         var table = new Table();
         table.Border(TableBorder.Rounded);
         table.AddColumn("[green]Query[/]");
         table.AddColumn("Description");
 
-        foreach (var (query, description) in examples)
+        table.AddRow("[bold cyan]— Commit Queries —[/]", "");
+        foreach (var (query, description) in commitExamples)
+        {
+            table.AddRow(Markup.Escape(query), description);
+        }
+        
+        table.AddRow("", "");
+        table.AddRow("[bold cyan]— Diff Queries —[/]", "");
+        foreach (var (query, description) in diffExamples)
+        {
+            table.AddRow(Markup.Escape(query), description);
+        }
+
+        table.AddRow("", "");
+        table.AddRow("[bold cyan]— Diff Content Queries —[/]", "");
+        foreach (var (query, description) in diffContentExamples)
         {
             table.AddRow(Markup.Escape(query), description);
         }

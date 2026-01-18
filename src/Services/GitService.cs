@@ -1,58 +1,120 @@
-﻿using LibGit2Sharp;
+﻿using GitLinq.Models;
+using LibGit2Sharp;
 
-namespace GitLinq.Services
+namespace GitLinq.Services;
+
+/// <summary>
+/// Service for interacting with Git repositories.
+/// </summary>
+internal class GitService
 {
-    public class CommitInfo
+    private readonly string _repositoryPath;
+    
+    public GitService(string repositoryPath)
     {
-        public string Sha { get; set; } = "";
-        public string Message { get; set; } = "";
-        public string MessageShort { get; set; } = "";
-        public string AuthorName { get; set; } = "";
-        public string AuthorEmail { get; set; } = "";
-        public DateTimeOffset AuthorWhen { get; set; }
-        public string CommitterName { get; set; } = "";
-        public string CommitterEmail { get; set; } = "";
-        public DateTimeOffset CommitterWhen { get; set; }
+        _repositoryPath = repositoryPath;
     }
 
-    internal class GitService
+    public List<CommitInfo> GetCommits()
     {
-        private string _repositoryPath;
-        public GitService(string repositoryPath)
+        using var repository = new Repository(_repositoryPath);
+        var result = new List<CommitInfo>();
+
+        foreach (var commit in repository.Commits)
         {
-            _repositoryPath = repositoryPath;
+            var commitInfo = new CommitInfo
+            {
+                Sha = commit.Sha,
+                Message = commit.Message.TrimEnd(),
+                MessageShort = commit.MessageShort.TrimEnd(),
+                AuthorName = commit.Author.Name,
+                AuthorEmail = commit.Author.Email,
+                AuthorWhen = commit.Author.When,
+                CommitterName = commit.Committer.Name,
+                CommitterEmail = commit.Committer.Email,
+                CommitterWhen = commit.Committer.When,
+                Diff = new DiffData
+                {
+                    Files = GetFileChanges(repository, commit)
+                }
+            };
+            result.Add(commitInfo);
         }
 
-        public List<CommitInfo> GetCommits()
+        return result;
+    }
+
+    private List<FileChange> GetFileChanges(Repository repository, Commit commit)
+    {
+        var changes = new List<FileChange>();
+
+        // Compare with parent commit, or empty tree if no parent (initial commit)
+        var parent = commit.Parents.FirstOrDefault();
+        var parentTree = parent?.Tree;
+        
+        var patch = repository.Diff.Compare<Patch>(parentTree, commit.Tree);
+
+        foreach (var entry in patch)
         {
-            using var repository = new Repository(_repositoryPath);
-
-            return repository.Commits.Select(c => new CommitInfo
+            var fileChange = new FileChange
             {
-                Sha = c.Sha,
-                Message = c.Message.TrimEnd(),
-                MessageShort = c.MessageShort.TrimEnd(),
-                AuthorName = c.Author.Name,
-                AuthorEmail = c.Author.Email,
-                AuthorWhen = c.Author.When,
-                CommitterName = c.Committer.Name,
-                CommitterEmail = c.Committer.Email,
-                CommitterWhen = c.Committer.When
-            }).ToList();
-        }
-        public static string? FindGitRoot(string startPath)
-        {
-            var dir = new DirectoryInfo(startPath);
-
-            while (dir != null)
+                Path = entry.Path,
+                OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
+                Status = entry.Status.ToString(),
+                LinesAdded = entry.LinesAdded,
+                LinesDeleted = entry.LinesDeleted,
+                IsBinary = entry.IsBinaryComparison
+            };
+            
+            // Extract actual diff content (added and deleted lines)
+            if (!entry.IsBinaryComparison)
             {
-                if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
-                    return dir.FullName;
-
-                dir = dir.Parent;
+                ExtractDiffContent(entry.Patch, fileChange);
             }
-
-            return null;
+            
+            changes.Add(fileChange);
         }
+
+        return changes;
+    }
+    
+    /// <summary>
+    /// Parses the patch text to extract added and deleted line content.
+    /// </summary>
+    private void ExtractDiffContent(string patchText, FileChange fileChange)
+    {
+        if (string.IsNullOrEmpty(patchText))
+            return;
+            
+        var lines = patchText.Split('\n');
+        
+        foreach (var line in lines)
+        {
+            if (line.StartsWith('+') && !line.StartsWith("+++"))
+            {
+                // Added line - remove the '+' prefix
+                fileChange.AddedContent.Add(line.Length > 1 ? line[1..] : "");
+            }
+            else if (line.StartsWith('-') && !line.StartsWith("---"))
+            {
+                // Deleted line - remove the '-' prefix
+                fileChange.DeletedContent.Add(line.Length > 1 ? line[1..] : "");
+            }
+        }
+    }
+
+    public static string? FindGitRoot(string startPath)
+    {
+        var dir = new DirectoryInfo(startPath);
+
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+                return dir.FullName;
+
+            dir = dir.Parent;
+        }
+
+        return null;
     }
 }
