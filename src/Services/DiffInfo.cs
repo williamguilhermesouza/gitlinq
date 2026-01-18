@@ -34,65 +34,125 @@ public class FileChange
     /// Whether this is a binary file.
     /// </summary>
     public bool IsBinary { get; set; }
+    
+    /// <summary>
+    /// The actual text content of lines that were added (without the '+' prefix).
+    /// </summary>
+    public List<string> AddedContent { get; set; } = new();
+    
+    /// <summary>
+    /// The actual text content of lines that were deleted (without the '-' prefix).
+    /// </summary>
+    public List<string> DeletedContent { get; set; } = new();
+    
+    /// <summary>
+    /// Check if any added line contains the specified text.
+    /// </summary>
+    public bool AddedContains(string text) => 
+        AddedContent.Any(line => line.Contains(text, StringComparison.OrdinalIgnoreCase));
+    
+    /// <summary>
+    /// Check if any deleted line contains the specified text.
+    /// </summary>
+    public bool DeletedContains(string text) => 
+        DeletedContent.Any(line => line.Contains(text, StringComparison.OrdinalIgnoreCase));
+    
+    /// <summary>
+    /// Check if any changed line (added or deleted) contains the specified text.
+    /// </summary>
+    public bool ContentContains(string text) => 
+        AddedContains(text) || DeletedContains(text);
+    
+    /// <summary>
+    /// Get lines from AddedContent that contain the text, with context (previous and next lines).
+    /// Returns tuples of (lineIndex, line, matchType) where matchType is "added".
+    /// </summary>
+    public List<MatchedLine> GetAddedMatches(string text)
+    {
+        var matches = new List<MatchedLine>();
+        for (int i = 0; i < AddedContent.Count; i++)
+        {
+            if (AddedContent[i].Contains(text, StringComparison.OrdinalIgnoreCase))
+            {
+                var contextLines = new List<(string line, bool isMatch)>();
+                
+                // Previous line
+                if (i > 0)
+                    contextLines.Add((AddedContent[i - 1], false));
+                
+                // Matching line
+                contextLines.Add((AddedContent[i], true));
+                
+                // Next line
+                if (i < AddedContent.Count - 1)
+                    contextLines.Add((AddedContent[i + 1], false));
+                
+                matches.Add(new MatchedLine
+                {
+                    FilePath = Path,
+                    MatchType = "added",
+                    SearchText = text,
+                    ContextLines = contextLines
+                });
+            }
+        }
+        return matches;
+    }
+    
+    /// <summary>
+    /// Get lines from DeletedContent that contain the text, with context.
+    /// </summary>
+    public List<MatchedLine> GetDeletedMatches(string text)
+    {
+        var matches = new List<MatchedLine>();
+        for (int i = 0; i < DeletedContent.Count; i++)
+        {
+            if (DeletedContent[i].Contains(text, StringComparison.OrdinalIgnoreCase))
+            {
+                var contextLines = new List<(string line, bool isMatch)>();
+                
+                // Previous line
+                if (i > 0)
+                    contextLines.Add((DeletedContent[i - 1], false));
+                
+                // Matching line
+                contextLines.Add((DeletedContent[i], true));
+                
+                // Next line
+                if (i < DeletedContent.Count - 1)
+                    contextLines.Add((DeletedContent[i + 1], false));
+                
+                matches.Add(new MatchedLine
+                {
+                    FilePath = Path,
+                    MatchType = "deleted",
+                    SearchText = text,
+                    ContextLines = contextLines
+                });
+            }
+        }
+        return matches;
+    }
+    
+    /// <summary>
+    /// Get all content matches (added and deleted) that contain the text, with context.
+    /// </summary>
+    public List<MatchedLine> GetContentMatches(string text)
+    {
+        var matches = new List<MatchedLine>();
+        matches.AddRange(GetAddedMatches(text));
+        matches.AddRange(GetDeletedMatches(text));
+        return matches;
+    }
 }
 
 /// <summary>
-/// Represents a commit with its associated file changes (diff).
+/// Represents a matched line with context for display.
 /// </summary>
-public class CommitDiff
+public class MatchedLine
 {
-    /// <summary>
-    /// The commit SHA.
-    /// </summary>
-    public string Sha { get; set; } = "";
-    
-    /// <summary>
-    /// Short SHA (7 characters).
-    /// </summary>
-    public string ShortSha => Sha.Length >= 7 ? Sha[..7] : Sha;
-    
-    /// <summary>
-    /// The commit message.
-    /// </summary>
-    public string Message { get; set; } = "";
-    
-    /// <summary>
-    /// Short commit message (first line).
-    /// </summary>
-    public string MessageShort { get; set; } = "";
-    
-    /// <summary>
-    /// Author name.
-    /// </summary>
-    public string AuthorName { get; set; } = "";
-    
-    /// <summary>
-    /// Author email.
-    /// </summary>
-    public string AuthorEmail { get; set; } = "";
-    
-    /// <summary>
-    /// When the commit was authored.
-    /// </summary>
-    public DateTimeOffset AuthorWhen { get; set; }
-    
-    /// <summary>
-    /// List of file changes in this commit.
-    /// </summary>
-    public List<FileChange> Files { get; set; } = new();
-    
-    /// <summary>
-    /// Total lines added across all files.
-    /// </summary>
-    public int TotalLinesAdded => Files.Sum(f => f.LinesAdded);
-    
-    /// <summary>
-    /// Total lines deleted across all files.
-    /// </summary>
-    public int TotalLinesDeleted => Files.Sum(f => f.LinesDeleted);
-    
-    /// <summary>
-    /// Number of files changed.
-    /// </summary>
-    public int FilesChanged => Files.Count;
+    public string FilePath { get; set; } = "";
+    public string MatchType { get; set; } = ""; // "added" or "deleted"
+    public string SearchText { get; set; } = "";
+    public List<(string line, bool isMatch)> ContextLines { get; set; } = new();
 }

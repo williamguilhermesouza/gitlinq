@@ -2,6 +2,7 @@
 using GitLinq.Commands;
 using GitLinq.Services;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -80,7 +81,7 @@ void RunInteractiveMode()
     {
         ExpressionBuilder = expressionBuilder,
         Commands = commands,
-        DisplayResult = DisplayResult
+        DisplayResult = result => DisplayResult(result)
     };
 
     AnsiConsole.MarkupLine("[bold]GitLinq[/] - Query git commits using LINQ-like syntax");
@@ -114,9 +115,12 @@ bool ExecuteQuery(string query)
             PrintDebugInputInfo(sanitizedQuery, "after sanitization");
         }
         
+        // Extract search text if this is a content search query
+        var contentSearchText = ExtractContentSearchText(sanitizedQuery);
+        
         var ast = QueryParser.ParseExpression(sanitizedQuery);
         var result = expressionBuilder.Execute(ast);
-        DisplayResult(result);
+        DisplayResult(result, contentSearchText);
         return true;
     }
     catch (Exception ex)
@@ -156,7 +160,7 @@ void PrintHelp()
     });
 }
 
-void DisplayResult(object? result)
+void DisplayResult(object? result, string? contentSearchText = null)
 {
     switch (result)
     {
@@ -164,16 +168,10 @@ void DisplayResult(object? result)
             AnsiConsole.MarkupLine("[dim](null)[/]");
             break;
         case IEnumerable<CommitInfo> commits:
-            DisplayCommitsTable(commits);
+            DisplayCommitsTable(commits, contentSearchText);
             break;
         case CommitInfo commit:
-            DisplayCommitsTable([commit]);
-            break;
-        case IEnumerable<CommitDiff> diffs:
-            DisplayDiffsTable(diffs);
-            break;
-        case CommitDiff diff:
-            DisplayDiffsTable([diff]);
+            DisplayCommitsTable([commit], contentSearchText);
             break;
         case IEnumerable<FileChange> files:
             DisplayFilesTable(files);
@@ -191,7 +189,7 @@ void DisplayResult(object? result)
     }
 }
 
-void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
+void DisplayCommitsTable(IEnumerable<CommitInfo> commits, string? contentSearchText = null)
 {
     var commitList = commits.ToList();
     
@@ -204,59 +202,41 @@ void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
     var table = new Table()
         .Border(TableBorder.Rounded)
         .AddColumn(new TableColumn("[green]SHA[/]").Width(10))
-        .AddColumn(new TableColumn("[blue]Author[/]").Width(20))
-        .AddColumn(new TableColumn("[yellow]Date[/]").Width(20))
+        .AddColumn(new TableColumn("[blue]Author[/]").Width(15))
+        .AddColumn(new TableColumn("[yellow]Date[/]").Width(17))
+        .AddColumn(new TableColumn("[cyan]Files[/]").Width(6).RightAligned())
+        .AddColumn(new TableColumn("[green]+[/]").Width(7).RightAligned())
+        .AddColumn(new TableColumn("[red]-[/]").Width(7).RightAligned())
         .AddColumn("Message");
 
     foreach (var commit in commitList)
     {
+        var authorDisplay = commit.AuthorName.Length > 15 
+            ? commit.AuthorName[..12] + "..." 
+            : commit.AuthorName;
+        var messageDisplay = commit.MessageShort.Length > 35 
+            ? commit.MessageShort[..32] + "..." 
+            : commit.MessageShort;
+            
         table.AddRow(
             Markup.Escape(commit.Sha[..7]),
-            Markup.Escape(commit.AuthorName),
+            Markup.Escape(authorDisplay),
             commit.AuthorWhen.ToString("yyyy-MM-dd HH:mm"),
-            Markup.Escape(commit.MessageShort)
+            commit.Diff.FilesChanged.ToString(),
+            $"[green]+{commit.Diff.TotalLinesAdded}[/]",
+            $"[red]-{commit.Diff.TotalLinesDeleted}[/]",
+            Markup.Escape(messageDisplay)
         );
     }
 
     AnsiConsole.Write(table);
     AnsiConsole.MarkupLine($"[dim]({commitList.Count} commit{(commitList.Count != 1 ? "s" : "")})[/]");
-}
-
-void DisplayDiffsTable(IEnumerable<CommitDiff> diffs)
-{
-    var diffList = diffs.ToList();
     
-    if (diffList.Count == 0)
+    // If this is a content search, display matching lines with context
+    if (!string.IsNullOrEmpty(contentSearchText))
     {
-        AnsiConsole.MarkupLine("[dim]No commits found.[/]");
-        return;
+        DisplayContentMatches(commitList, contentSearchText);
     }
-
-    var table = new Table()
-        .Border(TableBorder.Rounded)
-        .AddColumn(new TableColumn("[green]SHA[/]").Width(10))
-        .AddColumn(new TableColumn("[blue]Author[/]").Width(15))
-        .AddColumn(new TableColumn("[yellow]Date[/]").Width(17))
-        .AddColumn(new TableColumn("[cyan]Files[/]").Width(7).RightAligned())
-        .AddColumn(new TableColumn("[green]+[/]").Width(6).RightAligned())
-        .AddColumn(new TableColumn("[red]-[/]").Width(6).RightAligned())
-        .AddColumn("Message");
-
-    foreach (var diff in diffList)
-    {
-        table.AddRow(
-            Markup.Escape(diff.ShortSha),
-            Markup.Escape(diff.AuthorName.Length > 15 ? diff.AuthorName[..12] + "..." : diff.AuthorName),
-            diff.AuthorWhen.ToString("yyyy-MM-dd HH:mm"),
-            diff.FilesChanged.ToString(),
-            $"[green]+{diff.TotalLinesAdded}[/]",
-            $"[red]-{diff.TotalLinesDeleted}[/]",
-            Markup.Escape(diff.MessageShort.Length > 40 ? diff.MessageShort[..37] + "..." : diff.MessageShort)
-        );
-    }
-
-    AnsiConsole.Write(table);
-    AnsiConsole.MarkupLine($"[dim]({diffList.Count} commit{(diffList.Count != 1 ? "s" : "")})[/]");
 }
 
 void DisplayFilesTable(IEnumerable<FileChange> files)
@@ -304,6 +284,139 @@ void DisplayFilesTable(IEnumerable<FileChange> files)
 }
 
 // ============== Debug Functions ==============
+
+/// <summary>
+/// Extract the search text from content search queries like AddedContains, DeletedContains, ContentContains.
+/// Supports both double quotes ("text") and single quotes ('text').
+/// </summary>
+string? ExtractContentSearchText(string query)
+{
+    // Look for patterns like: AddedContains("text"), DeletedContains("text"), ContentContains("text")
+    var patterns = new[] { "AddedContains", "DeletedContains", "ContentContains" };
+    
+    foreach (var pattern in patterns)
+    {
+        var index = query.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+        if (index >= 0)
+        {
+            // Find the opening parenthesis and extract the string
+            var parenStart = query.IndexOf('(', index);
+            if (parenStart >= 0)
+            {
+                // Try double quotes first
+                var doubleQuoteStart = query.IndexOf('"', parenStart);
+                if (doubleQuoteStart >= 0)
+                {
+                    var doubleQuoteEnd = query.IndexOf('"', doubleQuoteStart + 1);
+                    if (doubleQuoteEnd > doubleQuoteStart)
+                    {
+                        return query[(doubleQuoteStart + 1)..doubleQuoteEnd];
+                    }
+                }
+                
+                // Try single quotes
+                var singleQuoteStart = query.IndexOf('\'', parenStart);
+                if (singleQuoteStart >= 0)
+                {
+                    var singleQuoteEnd = query.IndexOf('\'', singleQuoteStart + 1);
+                    if (singleQuoteEnd > singleQuoteStart)
+                    {
+                        return query[(singleQuoteStart + 1)..singleQuoteEnd];
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+/// <summary>
+/// Display matching content lines with context for content search queries.
+/// </summary>
+void DisplayContentMatches(List<CommitInfo> commits, string searchText)
+{
+    AnsiConsole.WriteLine();
+    AnsiConsole.MarkupLine($"[bold cyan]Matching lines for '[yellow]{Markup.Escape(searchText)}[/]':[/]");
+    AnsiConsole.WriteLine();
+    
+    var totalMatches = 0;
+    
+    foreach (var commit in commits)
+    {
+        var commitMatches = new List<(string filePath, MatchedLine match)>();
+        
+        foreach (var file in commit.Diff.Files)
+        {
+            var matches = file.GetContentMatches(searchText);
+            foreach (var match in matches)
+            {
+                commitMatches.Add((file.Path, match));
+            }
+        }
+        
+        if (commitMatches.Count > 0)
+        {
+            // Create a panel for each commit with matches
+            var content = new List<IRenderable>();
+            content.Add(new Markup($"[green]{commit.Sha[..7]}[/] [dim]{Markup.Escape(commit.MessageShort)}[/]"));
+            content.Add(new Text(""));
+            
+            foreach (var (filePath, match) in commitMatches)
+            {
+                var typeColor = match.MatchType == "added" ? "green" : "red";
+                var typeSymbol = match.MatchType == "added" ? "+" : "-";
+                
+                content.Add(new Markup($"  [dim]{Markup.Escape(filePath)}[/] [bold {typeColor}]({typeSymbol})[/]"));
+                
+                foreach (var (line, isMatch) in match.ContextLines)
+                {
+                    var lineContent = line.Length > 80 ? line[..77] + "..." : line;
+                    if (isMatch)
+                    {
+                        // Highlight the matching line and the search text within it
+                        var highlighted = HighlightSearchText(lineContent, searchText, typeColor);
+                        content.Add(new Markup($"    [bold {typeColor}]→[/] {highlighted}"));
+                    }
+                    else
+                    {
+                        content.Add(new Markup($"      [dim]{Markup.Escape(lineContent)}[/]"));
+                    }
+                }
+                content.Add(new Text(""));
+                totalMatches++;
+            }
+            
+            var panel = new Panel(new Rows(content))
+            {
+                Border = BoxBorder.Rounded,
+                Padding = new Padding(1, 0)
+            };
+            AnsiConsole.Write(panel);
+        }
+    }
+    
+    AnsiConsole.MarkupLine($"[dim]({totalMatches} matching location{(totalMatches != 1 ? "s" : "")})[/]");
+}
+
+/// <summary>
+/// Highlight search text within a line.
+/// </summary>
+string HighlightSearchText(string line, string searchText, string color)
+{
+    var escapedLine = Markup.Escape(line);
+    var index = line.IndexOf(searchText, StringComparison.OrdinalIgnoreCase);
+    
+    if (index >= 0)
+    {
+        var before = Markup.Escape(line[..index]);
+        var match = Markup.Escape(line.Substring(index, searchText.Length));
+        var after = Markup.Escape(line[(index + searchText.Length)..]);
+        return $"{before}[bold yellow on {color}]{match}[/]{after}";
+    }
+    
+    return escapedLine;
+}
 
 void PrintDebugEnvironmentInfo()
 {

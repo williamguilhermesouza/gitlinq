@@ -110,7 +110,6 @@ public class LinqExpressionBuilder
         return node.Name switch
         {
             "Commits" => Expression.Constant(GetCommits()),
-            "Diffs" => Expression.Constant(GetCommitDiffs()),
             _ => throw new NotSupportedException($"Unknown identifier: {node.Name}")
         };
     }
@@ -122,12 +121,6 @@ public class LinqExpressionBuilder
             
         var gitRoot = GitService.FindGitRoot(_repositoryPath) ?? _repositoryPath;
         return new GitService(gitRoot).GetCommits();
-    }
-
-    private List<CommitDiff> GetCommitDiffs()
-    {
-        var gitRoot = GitService.FindGitRoot(_repositoryPath) ?? _repositoryPath;
-        return new GitService(gitRoot).GetCommitDiffs();
     }
 
     private Expression BuildMemberAccess(MemberAccessNode node)
@@ -172,12 +165,17 @@ public class LinqExpressionBuilder
     {
         var elementType = GetEnumerableElementType(source.Type);
         
+        // Save the previous element type to restore after nested lambdas
+        var previousElementType = _currentElementType;
+        
         // Set the current element type so lambda building knows the parameter type
         _currentElementType = elementType;
         
         // Now build the arguments (lambdas will use the correct element type)
         var arguments = argumentNodes.Select(BuildExpression).ToList();
-        _currentElementType = elementType;
+        
+        // Restore the previous element type after building arguments
+        _currentElementType = previousElementType;
         
         return methodName switch
         {

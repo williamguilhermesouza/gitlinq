@@ -94,12 +94,9 @@ GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate co
 
 ### Data Sources
 
-GitLinq provides two data sources for querying:
-
 | Source | Description |
 |--------|-------------|
-| `Commits` | Basic commit information (fast) |
-| `Diffs` | Commits with file change statistics (includes added/deleted lines per file) |
+| `Commits` | Full commit information including diff data via the `Diff` property |
 
 ### Commits Properties
 
@@ -111,18 +108,12 @@ GitLinq provides two data sources for querying:
 | `AuthorName` | string | Author's name |
 | `AuthorEmail` | string | Author's email |
 | `AuthorWhen` | DateTimeOffset | Author timestamp |
+| `Diff` | DiffData | File changes, lines added/deleted for this commit |
 
-### Diffs Properties (CommitDiff)
+### Diff Property (DiffData)
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Sha` | string | Full commit SHA hash |
-| `ShortSha` | string | 7-character SHA |
-| `Message` | string | Full commit message |
-| `MessageShort` | string | First line of commit message |
-| `AuthorName` | string | Author's name |
-| `AuthorEmail` | string | Author's email |
-| `AuthorWhen` | DateTimeOffset | Author timestamp |
 | `Files` | List&lt;FileChange&gt; | List of changed files |
 | `TotalLinesAdded` | int | Sum of lines added across all files |
 | `TotalLinesDeleted` | int | Sum of lines deleted across all files |
@@ -138,6 +129,16 @@ GitLinq provides two data sources for querying:
 | `LinesAdded` | int | Lines added in this file |
 | `LinesDeleted` | int | Lines deleted in this file |
 | `IsBinary` | bool | Whether file is binary |
+| `AddedContent` | List&lt;string&gt; | Actual text lines that were added |
+| `DeletedContent` | List&lt;string&gt; | Actual text lines that were deleted |
+
+### FileChange Methods (for content searching)
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `AddedContains(text)` | Check if any added line contains text (case-insensitive) | `f.AddedContains("TODO")` |
+| `DeletedContains(text)` | Check if any deleted line contains text (case-insensitive) | `f.DeletedContains("bug")` |
+| `ContentContains(text)` | Check if any changed line (added or deleted) contains text | `f.ContentContains("password")` |
 
 ### Supported Methods
 
@@ -222,26 +223,47 @@ Commits.Where(c => c.AuthorName.Contains("Alice")).Take(5)
 ### Diff Queries (with file change statistics)
 
 ```bash
-# Get all commits with diff stats
-Diffs.Take(10)
-
 # Find commits that changed more than 5 files
-Diffs.Where(d => d.FilesChanged > 5)
+Commits.Where(c => c.Diff.FilesChanged > 5)
 
 # Find commits with more than 100 lines added
-Diffs.Where(d => d.TotalLinesAdded > 100).Take(10)
+Commits.Where(c => c.Diff.TotalLinesAdded > 100).Take(10)
 
 # Find commits with significant deletions
-Diffs.Where(d => d.TotalLinesDeleted >= 50)
+Commits.Where(c => c.Diff.TotalLinesDeleted >= 50)
 
 # Get files changed in the most recent commit
-Diffs.First().Files
+Commits.First().Diff.Files
 
 # Find single-file commits
-Diffs.Where(d => d.FilesChanged == 1).Take(10)
+Commits.Where(c => c.Diff.FilesChanged == 1).Take(10)
 
 # Find large refactoring commits (many files, many changes)
-Diffs.Where(d => d.FilesChanged >= 10).Take(5)
+Commits.Where(c => c.Diff.FilesChanged >= 10).Take(5)
+
+# Combine commit message filtering with diff statistics
+Commits.Where(c => c.Message.Contains("refactor")).Where(c => c.Diff.FilesChanged > 3)
+```
+
+### Diff Content Queries (search actual code changes)
+
+```bash
+# Find commits that added a TODO comment
+Commits.Where(c => c.Diff.Files.Any(f => f.AddedContains("TODO")))
+
+# Find commits that removed code containing "bug"
+Commits.Where(c => c.Diff.Files.Any(f => f.DeletedContains("bug")))
+
+# Find commits that touched code containing "password" (added or deleted)
+Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains("password")))
+
+# Find commits that added "console.log" (for debugging cleanup)
+
+# Find commits where a specific function was modified
+Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains("myFunction")))
+
+# View the actual added lines in the most recent commit's first file
+Commits.First().Diff.Files.First().AddedContent
 ```
 
 ## Interactive Commands
@@ -352,4 +374,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Made with ❤️ by [William Guilherme](https://github.com/williamguilhermesouza) using .NET 8.0
+Made by [William Guilherme](https://github.com/williamguilhermesouza) using .NET 8.0

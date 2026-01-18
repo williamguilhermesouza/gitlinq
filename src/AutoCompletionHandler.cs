@@ -3,25 +3,33 @@
 internal class AutoCompletionHandler : IAutoCompleteHandler
 {
     // Data sources
-    private static readonly string[] DataSources = ["Commits", "Diffs"];
+    private static readonly string[] DataSources = ["Commits"];
 
     // Commit properties
     private static readonly string[] CommitProperties =
     [
-        "Sha", "Message", "MessageShort", "AuthorName", "AuthorEmail", "AuthorWhen"
+        "Sha", "Message", "MessageShort", "AuthorName", "AuthorEmail", "AuthorWhen", "Diff"
     ];
-
-    // CommitDiff properties (for Diffs data source)
-    private static readonly string[] DiffProperties =
+    
+    // DiffData properties (for c.Diff)
+    private static readonly string[] DiffDataProperties =
     [
-        "Sha", "ShortSha", "Message", "MessageShort", "AuthorName", "AuthorEmail", "AuthorWhen",
         "Files", "TotalLinesAdded", "TotalLinesDeleted", "FilesChanged"
     ];
+    
+    // DiffData methods (for c.Diff.)
+    private static readonly Dictionary<string, string> DiffDataMethods = new()
+    {
+        ["AddedContains"] = "AddedContains('')",
+        ["DeletedContains"] = "DeletedContains('')",
+        ["ContentContains"] = "ContentContains('')"
+    };
 
     // FileChange properties
     private static readonly string[] FileChangeProperties =
     [
-        "Path", "OldPath", "Status", "LinesAdded", "LinesDeleted", "IsBinary"
+        "Path", "OldPath", "Status", "LinesAdded", "LinesDeleted", "IsBinary",
+        "AddedContent", "DeletedContent", "AddedContains", "DeletedContains", "ContentContains"
     ];
 
     // LINQ methods with their signatures
@@ -58,7 +66,6 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
             return [.. DataSources, .. Commands];
 
         var lastSegment = GetLastSegment(text);
-        var isDiffsContext = text.StartsWith("Diffs", StringComparison.OrdinalIgnoreCase);
         
         // Starting fresh or typing data source
         if (!text.Contains('.'))
@@ -74,22 +81,34 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
         // After a dot - suggest methods or properties
         if (text.EndsWith('.'))
         {
-            // After "Commits." or "Diffs." suggest LINQ methods
-            if (text.StartsWith("Commits", StringComparison.OrdinalIgnoreCase) || 
-                text.StartsWith("Diffs", StringComparison.OrdinalIgnoreCase))
+            // After "Commits." suggest LINQ methods
+            if (text.StartsWith("Commits", StringComparison.OrdinalIgnoreCase))
             {
                 // Check if this is ".Files." context
                 if (text.Contains(".Files."))
                     return FileChangeProperties;
+                
+                // Check if this is ".Diff." context (for Commits)
+                if (text.Contains(".Diff."))
+                    return [.. DiffDataProperties, .. DiffDataMethods.Keys];
                     
                 return LinqMethods.Keys.ToArray();
             }
             
-            // After "c." or "d." in lambda suggest properties based on context
+            // After "c." in lambda suggest properties
             if (IsInsideLambda(text))
-                return isDiffsContext ? DiffProperties : CommitProperties;
+            {
+                // Check for ".Diff." context inside lambda - suggest both properties and methods
+                if (text.Contains(".Diff."))
+                    return [.. DiffDataProperties, .. DiffDataMethods.Keys];
+                // Check for ".Files." context inside lambda (inside Any)
+                if (text.Contains(".Files.") || IsInsideFilesAny(text))
+                    return FileChangeProperties;
+                    
+                return CommitProperties;
+            }
                 
-            return isDiffsContext ? DiffProperties : CommitProperties;
+            return CommitProperties;
         }
 
         // Inside a lambda, after property dot (e.g., "c.Message.")
@@ -99,9 +118,29 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
         // Typing a method name after dot
         if (text.Contains('.') && !text.EndsWith('.'))
         {
-            // Check if we're inside a lambda typing a string method
+            // Check if we're inside a lambda typing
             if (IsInsideLambda(text))
             {
+                // Check if we're in Diff context (e.g., "c.Diff.Add")
+                if (IsInDiffContext(text))
+                {
+                    // DiffData methods like AddedContains
+                    var diffMethodMatches = DiffDataMethods.Keys
+                        .Where(m => m.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
+                        .Select(m => DiffDataMethods[m])
+                        .ToArray();
+                    if (diffMethodMatches.Length > 0)
+                        return diffMethodMatches;
+                    
+                    // DiffData properties
+                    var diffPropMatches = DiffDataProperties
+                        .Where(p => p.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
+                        .ToArray();
+                    if (diffPropMatches.Length > 0)
+                        return diffPropMatches;
+                }
+                
+                // String methods like Contains
                 var stringMatches = StringMethods.Keys
                     .Where(m => m.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
                     .Select(m => StringMethods[m])
@@ -109,9 +148,8 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
                 if (stringMatches.Length > 0)
                     return stringMatches;
                 
-                // Typing property name - use context-appropriate properties
-                var props = isDiffsContext ? DiffProperties : CommitProperties;
-                var propMatches = props
+                // Typing property name
+                var propMatches = CommitProperties
                     .Where(p => p.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
                     .ToArray();
                 if (propMatches.Length > 0)
@@ -145,5 +183,23 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
         var openParens = text.Count(c => c == '(');
         var closeParens = text.Count(c => c == ')');
         return openParens > closeParens && text.Contains("=>");
+    }
+    
+    private static bool IsInDiffContext(string text)
+    {
+        // Check if the last context before current typing is ".Diff."
+        var lastDiffIndex = text.LastIndexOf(".Diff.", StringComparison.OrdinalIgnoreCase);
+        if (lastDiffIndex < 0) return false;
+        
+        // Make sure there's no other property access after Diff (like .Files.)
+        var afterDiff = text[(lastDiffIndex + 6)..];
+        return !afterDiff.Contains('.');
+    }
+    
+    private static bool IsInsideFilesAny(string text)
+    {
+        // Check if we're inside Files.Any(f => f. context
+        return text.Contains(".Files.Any(", StringComparison.OrdinalIgnoreCase) && 
+               text.LastIndexOf("=>") > text.LastIndexOf(".Files.Any(", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -8,11 +8,21 @@ namespace GitLinq
         private static readonly Parser<string> Identifier =
             Parse.Letter.Or(Parse.Char('_')).AtLeastOnce().Text().Token();
 
-        private static readonly Parser<BaseNode> StringLiteral =
+        // String literals can use either double quotes ("...") or single quotes ('...')
+        private static readonly Parser<BaseNode> DoubleQuoteString =
             from open in Parse.Char('"')
             from content in Parse.CharExcept('"').Many().Text()
             from close in Parse.Char('"')
             select (BaseNode) new StringLiteralNode(content);
+
+        private static readonly Parser<BaseNode> SingleQuoteString =
+            from open in Parse.Char('\'')
+            from content in Parse.CharExcept('\'').Many().Text()
+            from close in Parse.Char('\'')
+            select (BaseNode) new StringLiteralNode(content);
+
+        private static readonly Parser<BaseNode> StringLiteral =
+            DoubleQuoteString.Or(SingleQuoteString);
 
         private static readonly Parser<BaseNode> NumberLiteral =
             from digits in Parse.Digit.AtLeastOnce().Text().Token()
