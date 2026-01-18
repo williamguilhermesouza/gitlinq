@@ -2,6 +2,11 @@
 using GitLinq.Commands;
 using GitLinq.Services;
 using Spectre.Console;
+using System.Text;
+
+// Set console encoding to UTF-8 for cross-platform compatibility
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 var gitRoot = GitService.FindGitRoot(Directory.GetCurrentDirectory());
 
@@ -80,6 +85,9 @@ void RunInteractiveMode()
         
         if (string.IsNullOrWhiteSpace(input))
             continue;
+
+        // Fix: ReadLine on some Windows terminals inserts null bytes
+        input = input.Replace("\0", "");
 
         if (!commands.TryExecute(input, context))
             ExecuteQuery(input);
