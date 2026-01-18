@@ -379,6 +379,19 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+## Reporting Issues
+
+Found a bug or have a feature request?
+
+- **GitHub Issues**: [Open an issue](https://github.com/williamguilhermesouza/gitlinq/issues) on the repository
+- **Email**: Contact me directly at williamguilhermesouza@gmail.com
+
+When reporting bugs, please include:
+- GitLinq version (`dotnet tool list -g | Select-String GitLinq`)
+- Operating system and terminal being used
+- Steps to reproduce the issue
+- Any error messages or unexpected output
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
