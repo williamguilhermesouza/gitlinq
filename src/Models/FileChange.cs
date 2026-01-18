@@ -1,4 +1,4 @@
-namespace GitLinq.Services;
+namespace GitLinq.Models;
 
 /// <summary>
 /// Represents a file change in a commit.
@@ -65,7 +65,6 @@ public class FileChange
     
     /// <summary>
     /// Get lines from AddedContent that contain the text, with context (previous and next lines).
-    /// Returns tuples of (lineIndex, line, matchType) where matchType is "added".
     /// </summary>
     public List<MatchedLine> GetAddedMatches(string text)
     {
@@ -144,15 +143,4 @@ public class FileChange
         matches.AddRange(GetDeletedMatches(text));
         return matches;
     }
-}
-
-/// <summary>
-/// Represents a matched line with context for display.
-/// </summary>
-public class MatchedLine
-{
-    public string FilePath { get; set; } = "";
-    public string MatchType { get; set; } = ""; // "added" or "deleted"
-    public string SearchText { get; set; } = "";
-    public List<(string line, bool isMatch)> ContextLines { get; set; } = new();
 }

@@ -1,5 +1,5 @@
 using GitLinq;
-using GitLinq.Services;
+using GitLinq.Models;
 
 namespace Tests.LinqExpressionBuilderTests;
 

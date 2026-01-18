@@ -1,4 +1,5 @@
 using GitLinq.AST;
+using GitLinq.Models;
 using GitLinq.Services;
 using System.Linq.Expressions;
 using System.Reflection;

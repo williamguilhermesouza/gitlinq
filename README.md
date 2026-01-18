@@ -280,7 +280,7 @@ Commits.First().Diff.Files.First().AddedContent
 
 ```
 src/
-├── Program.cs              # Entry point, CLI handling
+├── Program.cs              # Entry point, CLI handling, REPL loop
 ├── QueryParser.cs          # Sprache-based LINQ parser
 ├── LinqExpressionBuilder.cs # AST to LINQ Expression converter
 ├── AutoCompletionHandler.cs # Tab completion for REPL
@@ -296,10 +296,23 @@ src/
 ├── Commands/               # Interactive command system
 │   ├── ICommand.cs
 │   ├── CommandRegistry.cs
-│   ├── CommandContext.cs
-│   └── ...
-└── Services/
-    └── GitService.cs       # Git repository operations
+│   ├── HelpCommand.cs
+│   ├── ExamplesCommand.cs
+│   ├── HistoryCommand.cs
+│   ├── Clear.cs
+│   └── ExitCommand.cs
+├── Diagnostics/            # Debug and troubleshooting utilities
+│   └── DebugHelper.cs      # Environment info, terminal detection
+├── Models/                 # Domain models
+│   ├── CommitInfo.cs       # Git commit data
+│   ├── DiffData.cs         # Diff statistics and content search
+│   ├── FileChange.cs       # Individual file change data
+│   └── MatchedLine.cs      # Matched content with context
+├── Services/               # External service integrations
+│   └── GitService.cs       # Git repository operations (LibGit2Sharp)
+└── UI/                     # User interface components
+    ├── ResultDisplay.cs    # Query result rendering (tables, content)
+    └── HelpDisplay.cs      # CLI help output
 ```
 
 ## Dependencies
@@ -320,6 +333,12 @@ dotnet test
 ### Project Structure
 
 - `src/` - Main application source code
+  - `AST/` - Abstract Syntax Tree node types
+  - `Commands/` - REPL command implementations
+  - `Diagnostics/` - Debug and troubleshooting utilities
+  - `Models/` - Domain models (CommitInfo, DiffData, etc.)
+  - `Services/` - External integrations (Git via LibGit2Sharp)
+  - `UI/` - Display and rendering components
 - `tests/` - Unit tests for parser and expression builder
 
 ## Troubleshooting
