@@ -12,7 +12,7 @@
     
     <!-- NuGet Package Metadata -->
     <PackageId>GitLinq</PackageId>
-    <Version>0.0.2</Version>
+    <Version>0.1.2</Version>
     <Authors>Your Name</Authors>
     <Description>Query your Git commit history using LINQ-like syntax from the command line</Description>
     <PackageProjectUrl>https://github.com/williamguilhermesouza/gitlinq</PackageProjectUrl>
