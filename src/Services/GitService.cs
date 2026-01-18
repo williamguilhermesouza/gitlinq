@@ -40,6 +40,58 @@ namespace GitLinq.Services
                 CommitterWhen = c.Committer.When
             }).ToList();
         }
+
+        /// <summary>
+        /// Gets all commits with their file change information (diffs).
+        /// </summary>
+        public List<CommitDiff> GetCommitDiffs()
+        {
+            using var repository = new Repository(_repositoryPath);
+            var result = new List<CommitDiff>();
+
+            foreach (var commit in repository.Commits)
+            {
+                var commitDiff = new CommitDiff
+                {
+                    Sha = commit.Sha,
+                    Message = commit.Message.TrimEnd(),
+                    MessageShort = commit.MessageShort.TrimEnd(),
+                    AuthorName = commit.Author.Name,
+                    AuthorEmail = commit.Author.Email,
+                    AuthorWhen = commit.Author.When,
+                    Files = GetFileChanges(repository, commit)
+                };
+                result.Add(commitDiff);
+            }
+
+            return result;
+        }
+
+        private List<FileChange> GetFileChanges(Repository repository, Commit commit)
+        {
+            var changes = new List<FileChange>();
+
+            // Compare with parent commit, or empty tree if no parent (initial commit)
+            var parent = commit.Parents.FirstOrDefault();
+            var parentTree = parent?.Tree;
+            
+            var patch = repository.Diff.Compare<Patch>(parentTree, commit.Tree);
+
+            foreach (var entry in patch)
+            {
+                changes.Add(new FileChange
+                {
+                    Path = entry.Path,
+                    OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
+                    Status = entry.Status.ToString(),
+                    LinesAdded = entry.LinesAdded,
+                    LinesDeleted = entry.LinesDeleted,
+                    IsBinary = entry.IsBinaryComparison
+                });
+            }
+
+            return changes;
+        }
         public static string? FindGitRoot(string startPath)
         {
             var dir = new DirectoryInfo(startPath);

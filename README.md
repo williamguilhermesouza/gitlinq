@@ -92,7 +92,16 @@ gitlinq --query "Commits.Where(c => c.Message.Contains(\"fix\"))"
 
 GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate commits.
 
-### Available Properties
+### Data Sources
+
+GitLinq provides two data sources for querying:
+
+| Source | Description |
+|--------|-------------|
+| `Commits` | Basic commit information (fast) |
+| `Diffs` | Commits with file change statistics (includes added/deleted lines per file) |
+
+### Commits Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -102,6 +111,33 @@ GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate co
 | `AuthorName` | string | Author's name |
 | `AuthorEmail` | string | Author's email |
 | `AuthorWhen` | DateTimeOffset | Author timestamp |
+
+### Diffs Properties (CommitDiff)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Sha` | string | Full commit SHA hash |
+| `ShortSha` | string | 7-character SHA |
+| `Message` | string | Full commit message |
+| `MessageShort` | string | First line of commit message |
+| `AuthorName` | string | Author's name |
+| `AuthorEmail` | string | Author's email |
+| `AuthorWhen` | DateTimeOffset | Author timestamp |
+| `Files` | List&lt;FileChange&gt; | List of changed files |
+| `TotalLinesAdded` | int | Sum of lines added across all files |
+| `TotalLinesDeleted` | int | Sum of lines deleted across all files |
+| `FilesChanged` | int | Number of files changed |
+
+### FileChange Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Path` | string | File path |
+| `OldPath` | string? | Previous path (for renamed files) |
+| `Status` | string | Change type: Added, Deleted, Modified, Renamed |
+| `LinesAdded` | int | Lines added in this file |
+| `LinesDeleted` | int | Lines deleted in this file |
+| `IsBinary` | bool | Whether file is binary |
 
 ### Supported Methods
 
@@ -130,7 +166,20 @@ GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate co
 | `StartsWith(text)` | `c.Message.StartsWith("feat")` |
 | `EndsWith(text)` | `c.Message.EndsWith("!")` |
 
+### Comparison Operators in Predicates
+
+| Operator | Example |
+|----------|---------|
+| `>` | `d.FilesChanged > 5` |
+| `<` | `d.TotalLinesAdded < 100` |
+| `>=` | `d.FilesChanged >= 3` |
+| `<=` | `d.TotalLinesDeleted <= 10` |
+| `==` | `d.FilesChanged == 1` |
+| `!=` | `d.FilesChanged != 0` |
+
 ## Example Queries
+
+### Basic Commit Queries
 
 ```bash
 # Get all commits
@@ -168,6 +217,31 @@ Commits.Count(c => c.AuthorName.Contains("Bob"))
 
 # Chain multiple operations
 Commits.Where(c => c.AuthorName.Contains("Alice")).Take(5)
+```
+
+### Diff Queries (with file change statistics)
+
+```bash
+# Get all commits with diff stats
+Diffs.Take(10)
+
+# Find commits that changed more than 5 files
+Diffs.Where(d => d.FilesChanged > 5)
+
+# Find commits with more than 100 lines added
+Diffs.Where(d => d.TotalLinesAdded > 100).Take(10)
+
+# Find commits with significant deletions
+Diffs.Where(d => d.TotalLinesDeleted >= 50)
+
+# Get files changed in the most recent commit
+Diffs.First().Files
+
+# Find single-file commits
+Diffs.Where(d => d.FilesChanged == 1).Take(10)
+
+# Find large refactoring commits (many files, many changes)
+Diffs.Where(d => d.FilesChanged >= 10).Take(5)
 ```
 
 ## Interactive Commands

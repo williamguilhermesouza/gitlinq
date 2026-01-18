@@ -2,10 +2,26 @@
 
 internal class AutoCompletionHandler : IAutoCompleteHandler
 {
+    // Data sources
+    private static readonly string[] DataSources = ["Commits", "Diffs"];
+
     // Commit properties
     private static readonly string[] CommitProperties =
     [
         "Sha", "Message", "MessageShort", "AuthorName", "AuthorEmail", "AuthorWhen"
+    ];
+
+    // CommitDiff properties (for Diffs data source)
+    private static readonly string[] DiffProperties =
+    [
+        "Sha", "ShortSha", "Message", "MessageShort", "AuthorName", "AuthorEmail", "AuthorWhen",
+        "Files", "TotalLinesAdded", "TotalLinesDeleted", "FilesChanged"
+    ];
+
+    // FileChange properties
+    private static readonly string[] FileChangeProperties =
+    [
+        "Path", "OldPath", "Status", "LinesAdded", "LinesDeleted", "IsBinary"
     ];
 
     // LINQ methods with their signatures
@@ -39,27 +55,41 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
     public string[] GetSuggestions(string text, int index)
     {
         if (string.IsNullOrEmpty(text))
-            return ["Commits", .. Commands];
+            return [.. DataSources, .. Commands];
 
         var lastSegment = GetLastSegment(text);
+        var isDiffsContext = text.StartsWith("Diffs", StringComparison.OrdinalIgnoreCase);
         
-        // Starting fresh or typing "Commits"
+        // Starting fresh or typing data source
         if (!text.Contains('.'))
         {
-            if ("Commits".StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
-                return ["Commits"];
+            var sourceMatches = DataSources
+                .Where(s => s.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (sourceMatches.Length > 0)
+                return sourceMatches;
             return Commands.Where(c => c.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase)).ToArray();
         }
 
         // After a dot - suggest methods or properties
         if (text.EndsWith('.'))
         {
-            // After "Commits." suggest LINQ methods
-            if (text.StartsWith("Commits", StringComparison.OrdinalIgnoreCase))
+            // After "Commits." or "Diffs." suggest LINQ methods
+            if (text.StartsWith("Commits", StringComparison.OrdinalIgnoreCase) || 
+                text.StartsWith("Diffs", StringComparison.OrdinalIgnoreCase))
+            {
+                // Check if this is ".Files." context
+                if (text.Contains(".Files."))
+                    return FileChangeProperties;
+                    
                 return LinqMethods.Keys.ToArray();
+            }
             
-            // After "c." in lambda suggest properties
-            return CommitProperties;
+            // After "c." or "d." in lambda suggest properties based on context
+            if (IsInsideLambda(text))
+                return isDiffsContext ? DiffProperties : CommitProperties;
+                
+            return isDiffsContext ? DiffProperties : CommitProperties;
         }
 
         // Inside a lambda, after property dot (e.g., "c.Message.")
@@ -79,8 +109,9 @@ internal class AutoCompletionHandler : IAutoCompleteHandler
                 if (stringMatches.Length > 0)
                     return stringMatches;
                 
-                // Typing property name
-                var propMatches = CommitProperties
+                // Typing property name - use context-appropriate properties
+                var props = isDiffsContext ? DiffProperties : CommitProperties;
+                var propMatches = props
                     .Where(p => p.StartsWith(lastSegment, StringComparison.OrdinalIgnoreCase))
                     .ToArray();
                 if (propMatches.Length > 0)

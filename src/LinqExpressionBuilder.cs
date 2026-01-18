@@ -10,6 +10,7 @@ public class LinqExpressionBuilder
     private readonly Dictionary<string, ParameterExpression> _parameters = new();
     private readonly string _repositoryPath;
     private readonly List<CommitInfo>? _testCommits;
+    private Type? _currentElementType; // Track the current element type for lambda building
 
     public LinqExpressionBuilder(string? repositoryPath = null)
     {
@@ -56,6 +57,7 @@ public class LinqExpressionBuilder
             MemberAccessNode memberAccessNode => BuildMemberAccess(memberAccessNode),
             MethodCallNode methodCallNode => BuildMethodCall(methodCallNode),
             LambdaNode lambdaNode => BuildLambda(lambdaNode),
+            BinaryNode binaryNode => BuildBinary(binaryNode),
             _ => throw new NotSupportedException($"Node type {node.GetType().Name} not supported")
         };
     }
@@ -70,6 +72,32 @@ public class LinqExpressionBuilder
         return Expression.Constant(node.Value);
     }
 
+    private Expression BuildBinary(BinaryNode node)
+    {
+        var left = BuildExpression(node.Left);
+        var right = BuildExpression(node.Right);
+
+        // Handle type conversions if needed (e.g., int vs long)
+        if (left.Type != right.Type)
+        {
+            if (left.Type == typeof(int) && right.Type == typeof(long))
+                left = Expression.Convert(left, typeof(long));
+            else if (left.Type == typeof(long) && right.Type == typeof(int))
+                right = Expression.Convert(right, typeof(long));
+        }
+
+        return node.Operator switch
+        {
+            ">" => Expression.GreaterThan(left, right),
+            "<" => Expression.LessThan(left, right),
+            ">=" => Expression.GreaterThanOrEqual(left, right),
+            "<=" => Expression.LessThanOrEqual(left, right),
+            "==" => Expression.Equal(left, right),
+            "!=" => Expression.NotEqual(left, right),
+            _ => throw new NotSupportedException($"Operator '{node.Operator}' not supported")
+        };
+    }
+
     private Expression BuildIdentifier(IdentifierNode node)
     {
         // Check if this identifier is a parameter (from a lambda)
@@ -82,6 +110,7 @@ public class LinqExpressionBuilder
         return node.Name switch
         {
             "Commits" => Expression.Constant(GetCommits()),
+            "Diffs" => Expression.Constant(GetCommitDiffs()),
             _ => throw new NotSupportedException($"Unknown identifier: {node.Name}")
         };
     }
@@ -93,6 +122,12 @@ public class LinqExpressionBuilder
             
         var gitRoot = GitService.FindGitRoot(_repositoryPath) ?? _repositoryPath;
         return new GitService(gitRoot).GetCommits();
+    }
+
+    private List<CommitDiff> GetCommitDiffs()
+    {
+        var gitRoot = GitService.FindGitRoot(_repositoryPath) ?? _repositoryPath;
+        return new GitService(gitRoot).GetCommitDiffs();
     }
 
     private Expression BuildMemberAccess(MemberAccessNode node)
@@ -120,21 +155,29 @@ public class LinqExpressionBuilder
     private Expression BuildMethodCall(MethodCallNode node)
     {
         var target = BuildExpression(node.Target);
-        var arguments = node.Arguments.Select(BuildExpression).ToList();
 
         // Handle LINQ extension methods (Where, Select, etc.)
+        // Pass AST nodes instead of built expressions so we can set element type first
         if (IsEnumerableType(target.Type))
         {
-            return BuildLinqMethodCall(target, node.Method, arguments);
+            return BuildLinqMethodCall(target, node.Method, node.Arguments);
         }
 
         // Handle instance methods (like string.Contains)
+        var arguments = node.Arguments.Select(BuildExpression).ToList();
         return BuildInstanceMethodCall(target, node.Method, arguments);
     }
 
-    private Expression BuildLinqMethodCall(Expression source, string methodName, List<Expression> arguments)
+    private Expression BuildLinqMethodCall(Expression source, string methodName, IEnumerable<BaseNode> argumentNodes)
     {
         var elementType = GetEnumerableElementType(source.Type);
+        
+        // Set the current element type so lambda building knows the parameter type
+        _currentElementType = elementType;
+        
+        // Now build the arguments (lambdas will use the correct element type)
+        var arguments = argumentNodes.Select(BuildExpression).ToList();
+        _currentElementType = elementType;
         
         return methodName switch
         {
@@ -342,9 +385,8 @@ public class LinqExpressionBuilder
 
     private Expression BuildLambda(LambdaNode node)
     {
-        // We need to infer the parameter type from context
-        // For now, assume CommitInfo type for commit queries
-        var paramType = typeof(CommitInfo);
+        // Use the current element type from the LINQ method context, or default to CommitInfo
+        var paramType = _currentElementType ?? typeof(CommitInfo);
         var parameter = Expression.Parameter(paramType, node.Parameter);
         
         // Register the parameter so it can be resolved in the body

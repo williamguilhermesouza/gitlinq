@@ -12,7 +12,7 @@ public class ExamplesCommand : ICommand
     {
         AnsiConsole.MarkupLine("[bold]Example Queries:[/]\n");
         
-        var examples = new (string Query, string Description)[]
+        var commitExamples = new (string Query, string Description)[]
         {
             ("Commits", "Get all commits"),
             ("Commits.Take(10)", "Get the first 10 commits"),
@@ -27,12 +27,31 @@ public class ExamplesCommand : ICommand
             ("Commits.Count(c => c.AuthorName.Contains(\"Bob\"))", "Count commits by Bob"),
         };
 
+        var diffExamples = new (string Query, string Description)[]
+        {
+            ("Diffs", "Get all commits with diff stats"),
+            ("Diffs.Take(10)", "Get first 10 commits with file changes"),
+            ("Diffs.Where(d => d.FilesChanged > 5)", "Commits that changed more than 5 files"),
+            ("Diffs.Where(d => d.TotalLinesAdded > 100)", "Commits with more than 100 lines added"),
+            ("Diffs.Where(d => d.Files.Any(f => f.Path.Contains(\".cs\")))", "Commits that modified C# files"),
+            ("Diffs.First().Files", "Get files changed in the most recent commit"),
+            ("Diffs.Where(d => d.Files.Any(f => f.Status == \"Added\"))", "Commits that added new files"),
+        };
+
         var table = new Table();
         table.Border(TableBorder.Rounded);
         table.AddColumn("[green]Query[/]");
         table.AddColumn("Description");
 
-        foreach (var (query, description) in examples)
+        table.AddRow("[bold cyan]— Commit Queries —[/]", "");
+        foreach (var (query, description) in commitExamples)
+        {
+            table.AddRow(Markup.Escape(query), description);
+        }
+        
+        table.AddRow("", "");
+        table.AddRow("[bold cyan]— Diff Queries —[/]", "");
+        foreach (var (query, description) in diffExamples)
         {
             table.AddRow(Markup.Escape(query), description);
         }

@@ -169,6 +169,18 @@ void DisplayResult(object? result)
         case CommitInfo commit:
             DisplayCommitsTable([commit]);
             break;
+        case IEnumerable<CommitDiff> diffs:
+            DisplayDiffsTable(diffs);
+            break;
+        case CommitDiff diff:
+            DisplayDiffsTable([diff]);
+            break;
+        case IEnumerable<FileChange> files:
+            DisplayFilesTable(files);
+            break;
+        case FileChange file:
+            DisplayFilesTable([file]);
+            break;
         case int or long or bool:
             var color = result is bool b ? (b ? "green" : "red") : "green";
             AnsiConsole.MarkupLine($"[{color}]{result}[/]");
@@ -208,6 +220,87 @@ void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
 
     AnsiConsole.Write(table);
     AnsiConsole.MarkupLine($"[dim]({commitList.Count} commit{(commitList.Count != 1 ? "s" : "")})[/]");
+}
+
+void DisplayDiffsTable(IEnumerable<CommitDiff> diffs)
+{
+    var diffList = diffs.ToList();
+    
+    if (diffList.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[dim]No commits found.[/]");
+        return;
+    }
+
+    var table = new Table()
+        .Border(TableBorder.Rounded)
+        .AddColumn(new TableColumn("[green]SHA[/]").Width(10))
+        .AddColumn(new TableColumn("[blue]Author[/]").Width(15))
+        .AddColumn(new TableColumn("[yellow]Date[/]").Width(17))
+        .AddColumn(new TableColumn("[cyan]Files[/]").Width(7).RightAligned())
+        .AddColumn(new TableColumn("[green]+[/]").Width(6).RightAligned())
+        .AddColumn(new TableColumn("[red]-[/]").Width(6).RightAligned())
+        .AddColumn("Message");
+
+    foreach (var diff in diffList)
+    {
+        table.AddRow(
+            Markup.Escape(diff.ShortSha),
+            Markup.Escape(diff.AuthorName.Length > 15 ? diff.AuthorName[..12] + "..." : diff.AuthorName),
+            diff.AuthorWhen.ToString("yyyy-MM-dd HH:mm"),
+            diff.FilesChanged.ToString(),
+            $"[green]+{diff.TotalLinesAdded}[/]",
+            $"[red]-{diff.TotalLinesDeleted}[/]",
+            Markup.Escape(diff.MessageShort.Length > 40 ? diff.MessageShort[..37] + "..." : diff.MessageShort)
+        );
+    }
+
+    AnsiConsole.Write(table);
+    AnsiConsole.MarkupLine($"[dim]({diffList.Count} commit{(diffList.Count != 1 ? "s" : "")})[/]");
+}
+
+void DisplayFilesTable(IEnumerable<FileChange> files)
+{
+    var fileList = files.ToList();
+    
+    if (fileList.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[dim]No files found.[/]");
+        return;
+    }
+
+    var table = new Table()
+        .Border(TableBorder.Rounded)
+        .AddColumn(new TableColumn("[yellow]Status[/]").Width(10))
+        .AddColumn(new TableColumn("[green]+[/]").Width(6).RightAligned())
+        .AddColumn(new TableColumn("[red]-[/]").Width(6).RightAligned())
+        .AddColumn("Path");
+
+    foreach (var file in fileList)
+    {
+        var statusColor = file.Status switch
+        {
+            "Added" => "green",
+            "Deleted" => "red",
+            "Modified" => "yellow",
+            "Renamed" => "cyan",
+            _ => "white"
+        };
+        
+        var path = file.OldPath != null 
+            ? $"{file.OldPath} → {file.Path}" 
+            : file.Path;
+
+        table.AddRow(
+            $"[{statusColor}]{file.Status}[/]",
+            $"[green]+{file.LinesAdded}[/]",
+            $"[red]-{file.LinesDeleted}[/]",
+            Markup.Escape(path)
+        );
+    }
+
+    AnsiConsole.Write(table);
+    AnsiConsole.MarkupLine($"[dim]({fileList.Count} file{(fileList.Count != 1 ? "s" : "")})[/]");
 }
 
 // ============== Debug Functions ==============
