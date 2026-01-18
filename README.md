@@ -258,6 +258,7 @@ Commits.Where(c => c.Diff.Files.Any(f => f.DeletedContains("bug")))
 Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains("password")))
 
 # Find commits that added "console.log" (for debugging cleanup)
+Commits.Where(c => c.Diff.Files.Any(f => f.AddedContains("console.log")))
 
 # Find commits where a specific function was modified
 Commits.Where(c => c.Diff.Files.Any(f => f.ContentContains("myFunction")))
