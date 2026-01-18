@@ -2,11 +2,18 @@
 using GitLinq.Commands;
 using GitLinq.Services;
 using Spectre.Console;
+using System.Runtime.InteropServices;
 using System.Text;
 
 // Set console encoding to UTF-8 for cross-platform compatibility
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
+
+// Check for debug mode (set GITLINQ_DEBUG=1 to enable)
+var isDebugMode = Environment.GetEnvironmentVariable("GITLINQ_DEBUG") == "1";
+
+if (isDebugMode)
+    PrintDebugEnvironmentInfo();
 
 var gitRoot = GitService.FindGitRoot(Directory.GetCurrentDirectory());
 
@@ -86,9 +93,6 @@ void RunInteractiveMode()
         if (string.IsNullOrWhiteSpace(input))
             continue;
 
-        // Fix: ReadLine on some Windows terminals inserts null bytes
-        input = input.Replace("\0", "");
-
         if (!commands.TryExecute(input, context))
             ExecuteQuery(input);
     }
@@ -98,7 +102,19 @@ bool ExecuteQuery(string query)
 {
     try
     {
-        var ast = QueryParser.ParseExpression(query);
+        if (isDebugMode)
+            PrintDebugInputInfo(query, "before sanitization");
+        
+        // Fix: ReadLine on some Windows terminals inserts null bytes
+        var sanitizedQuery = query.Replace("\0", "");
+        
+        if (isDebugMode && sanitizedQuery != query)
+        {
+            AnsiConsole.MarkupLine("[yellow]Debug:[/] Null bytes were removed from input");
+            PrintDebugInputInfo(sanitizedQuery, "after sanitization");
+        }
+        
+        var ast = QueryParser.ParseExpression(sanitizedQuery);
         var result = expressionBuilder.Execute(ast);
         DisplayResult(result);
         return true;
@@ -106,6 +122,12 @@ bool ExecuteQuery(string query)
     catch (Exception ex)
     {
         AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+        if (isDebugMode)
+        {
+            AnsiConsole.MarkupLine($"[dim]Debug - Exception type: {ex.GetType().Name}[/]");
+            if (ex.InnerException != null)
+                AnsiConsole.MarkupLine($"[dim]Debug - Inner exception: {Markup.Escape(ex.InnerException.Message)}[/]");
+        }
         return false;
     }
 }
@@ -122,7 +144,10 @@ void PrintHelp()
             new Markup("[bold]Examples:[/]"),
             new Text("  gitlinq -q \"Commits.Take(10)\""),
             new Text("  gitlinq -q \"Commits.Where(c => c.Message.Contains(\\\"fix\\\"))\""),
-            new Text("  gitlinq -q \"Commits.Count()\"")
+            new Text("  gitlinq -q \"Commits.Count()\""),
+            Text.Empty,
+            new Markup("[bold]Environment Variables:[/]"),
+            new Text("  GITLINQ_DEBUG=1              Enable debug mode for troubleshooting")
         ))
     {
         Header = new PanelHeader("[bold]GitLinq[/] - Query git commits using LINQ-like syntax"),
@@ -183,4 +208,76 @@ void DisplayCommitsTable(IEnumerable<CommitInfo> commits)
 
     AnsiConsole.Write(table);
     AnsiConsole.MarkupLine($"[dim]({commitList.Count} commit{(commitList.Count != 1 ? "s" : "")})[/]");
+}
+
+// ============== Debug Functions ==============
+
+void PrintDebugEnvironmentInfo()
+{
+    var panel = new Panel(
+        new Rows(
+            new Markup($"[bold]GitLinq Debug Mode[/]"),
+            new Text(""),
+            new Markup($"[dim]OS:[/] {RuntimeInformation.OSDescription}"),
+            new Markup($"[dim]Architecture:[/] {RuntimeInformation.OSArchitecture}"),
+            new Markup($"[dim].NET Runtime:[/] {RuntimeInformation.FrameworkDescription}"),
+            new Text(""),
+            new Markup($"[dim]Console.InputEncoding:[/] {Console.InputEncoding.EncodingName} (CodePage: {Console.InputEncoding.CodePage})"),
+            new Markup($"[dim]Console.OutputEncoding:[/] {Console.OutputEncoding.EncodingName} (CodePage: {Console.OutputEncoding.CodePage})"),
+            new Text(""),
+            new Markup($"[dim]Terminal:[/] {GetTerminalInfo()}"),
+            new Markup($"[dim]Working Directory:[/] {Environment.CurrentDirectory}"),
+            new Text(""),
+            new Markup("[dim]Set GITLINQ_DEBUG=0 or unset to disable debug mode[/]")
+        ))
+    {
+        Header = new PanelHeader("[yellow]Debug Info[/]"),
+        Border = BoxBorder.Rounded,
+        Padding = new Padding(1, 0)
+    };
+    
+    AnsiConsole.Write(panel);
+    AnsiConsole.WriteLine();
+}
+
+void PrintDebugInputInfo(string input, string label)
+{
+    var bytes = Encoding.UTF8.GetBytes(input);
+    var hexBytes = string.Join(" ", bytes.Select(b => b.ToString("X2")));
+    var hasNullBytes = bytes.Contains((byte)0);
+    var hasNonAscii = bytes.Any(b => b > 127);
+    
+    AnsiConsole.MarkupLine($"[dim]Debug - Input ({label}):[/]");
+    AnsiConsole.MarkupLine($"[dim]  String: {Markup.Escape(input)}[/]");
+    AnsiConsole.MarkupLine($"[dim]  Length: {input.Length} chars, {bytes.Length} bytes[/]");
+    AnsiConsole.MarkupLine($"[dim]  Bytes: {hexBytes}[/]");
+    
+    if (hasNullBytes)
+        AnsiConsole.MarkupLine("[yellow]  Warning: Input contains null bytes (0x00)[/]");
+    if (hasNonAscii)
+        AnsiConsole.MarkupLine("[yellow]  Warning: Input contains non-ASCII characters[/]");
+}
+
+string GetTerminalInfo()
+{
+    var term = Environment.GetEnvironmentVariable("TERM") ?? "not set";
+    var termProgram = Environment.GetEnvironmentVariable("TERM_PROGRAM") ?? "";
+    var wtSession = Environment.GetEnvironmentVariable("WT_SESSION");
+    var conEmu = Environment.GetEnvironmentVariable("ConEmuANSI");
+    
+    if (!string.IsNullOrEmpty(wtSession))
+        return "Windows Terminal";
+    if (!string.IsNullOrEmpty(conEmu))
+        return "ConEmu";
+    if (!string.IsNullOrEmpty(termProgram))
+        return termProgram;
+    if (Environment.GetEnvironmentVariable("VSCODE_INJECTION") != null)
+        return "VS Code Integrated Terminal";
+        
+    // Check for PowerShell or CMD
+    var psVersion = Environment.GetEnvironmentVariable("PSVersionTable");
+    if (psVersion != null || Environment.GetEnvironmentVariable("PSModulePath") != null)
+        return "PowerShell";
+    
+    return term != "not set" ? term : "Unknown (likely CMD or basic console)";
 }

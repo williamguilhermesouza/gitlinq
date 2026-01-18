@@ -82,6 +82,12 @@ gitlinq --query "Commits.Where(c => c.Message.Contains(\"fix\"))"
 | `-q, --query <query>` | Execute a single query and exit |
 | `-h, --help` | Show help message |
 
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `GITLINQ_DEBUG=1` | Enable debug mode for troubleshooting terminal/encoding issues |
+
 ## Query Syntax
 
 GitLinq supports a LINQ-like query syntax to filter, transform, and aggregate commits.
@@ -219,6 +225,33 @@ dotnet test
 
 - `src/` - Main application source code
 - `tests/` - Unit tests for parser and expression builder
+
+## Troubleshooting
+
+If you encounter issues (especially on Windows PowerShell or CMD), enable debug mode:
+
+```bash
+# Windows PowerShell
+$env:GITLINQ_DEBUG="1"
+gitlinq
+
+# Windows CMD
+set GITLINQ_DEBUG=1
+gitlinq
+
+# Linux/macOS
+GITLINQ_DEBUG=1 gitlinq
+```
+
+Debug mode displays:
+- OS and .NET runtime information
+- Console encoding settings (important for quote handling)
+- Terminal type detection
+- Input byte analysis (helps identify encoding issues)
+
+**Common Issues:**
+- **"No commits found" when using Contains()**: This was caused by null bytes being inserted by the ReadLine library on some Windows terminals. Fixed in v0.0.2+.
+- **Garbled output**: Ensure your terminal supports UTF-8. The tool sets UTF-8 encoding automatically.
 
 ## Contributing
 
